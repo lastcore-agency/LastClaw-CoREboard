@@ -91,7 +91,7 @@ export function AgentInspector({ agent, onClose }: Props) {
 
         {/* Agent header */}
         <div className="inspector__header">
-          <div className="inspector__avatar">
+          <div className="inspector__avatar inspector__avatar--lg">
             <img
               src={agent.character.animated}
               alt={agent.displayName}
@@ -144,12 +144,14 @@ export function AgentInspector({ agent, onClose }: Props) {
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="tab-content" role="tabpanel">
-          {activeTab === 'status' && <StatusContent agent={agent} />}
-          {activeTab === 'configure' && <ConfigureContent agent={agent} />}
-          {activeTab === 'skills' && <SkillsContent agent={agent} />}
-          {activeTab === 'chat' && <ChatContent agent={agent} />}
+        {/* Tab content — scrollable with fade indicator */}
+        <div className="inspector__scroll-area">
+          <div className="tab-content" role="tabpanel">
+            {activeTab === 'status' && <StatusContent agent={agent} />}
+            {activeTab === 'configure' && <ConfigureContent agent={agent} />}
+            {activeTab === 'skills' && <SkillsContent agent={agent} />}
+            {activeTab === 'chat' && <ChatContent agent={agent} />}
+          </div>
         </div>
       </aside>
     </>

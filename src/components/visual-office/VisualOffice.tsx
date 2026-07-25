@@ -102,7 +102,7 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
       <div className="office-toolbar">
         <span className="office-toolbar__title">🏢 Agents Office</span>
         <div className="office-toolbar__actions">
-          <span className="toolbar-btn">{scene.name}</span>
+          <span className="toolbar-btn">{scene.name} <span className="source-badge source-badge--mock" style={{ marginLeft: 4 }}>⚠ MOCK</span></span>
           <button className="toolbar-btn" type="button" aria-label="Zoom out">−</button>
           <span className="toolbar-btn">100%</span>
           <button className="toolbar-btn" type="button" aria-label="Zoom in">+</button>
@@ -205,13 +205,14 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
               </circle>
               <text
                 x={(getAgentPos(handoff.from).x + getAgentPos(handoff.to).x) / 2}
-                y={(getAgentPos(handoff.from).y + getAgentPos(handoff.to).y) / 2 - 2}
+                y={Math.min(getAgentPos(handoff.from).y, getAgentPos(handoff.to).y) - 6}
                 className="handoff-label"
                 textAnchor="middle"
                 fill="var(--cyan)"
-                fontSize="2.5"
+                fontSize="1.8"
+                opacity="0.7"
               >
-                MOCK handoff
+                ⚠ MOCK handoff
               </text>
             </svg>
           )}

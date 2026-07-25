@@ -225,6 +225,19 @@ a { color: inherit; text-decoration: none; }
   -webkit-overflow-scrolling: touch;
 }
 
+/* D-01 fix: scroll indicator on mobile when cards clip */
+.runtime-grid::after {
+  content: '';
+  position: sticky;
+  right: 0;
+  flex-shrink: 0;
+  width: 24px;
+  min-height: 100%;
+  background: linear-gradient(90deg, transparent, var(--bg-deep) 80%);
+  pointer-events: none;
+  margin-left: -24px;
+}
+
 .runtime-grid::-webkit-scrollbar { height: 4px; }
 .runtime-grid::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
@@ -423,6 +436,11 @@ a { color: inherit; text-decoration: none; }
   aspect-ratio: 16 / 10;
   overflow: hidden;
   background: #0a1225;
+}
+
+/* D-07 fix: mobile scene keeps rooms in view */
+.scene-bg__img {
+  object-position: center top;
 }
 
 /* ── Scene Background Image ── */
@@ -720,8 +738,9 @@ a { color: inherit; text-decoration: none; }
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-mid);
   padding: 16px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 
   /* Desktop: right floating panel */
   top: 16px;
@@ -771,10 +790,27 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg-surface);
 }
 
+/* D-09 fix: larger avatar */
+.inspector__avatar--lg {
+  flex: 0 0 72px;
+  height: 80px;
+}
+
 .inspector__avatar img {
   width: 100%; height: 100%;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+/* D-10 fix: scroll area with fade indicator */
+.inspector__scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position: relative;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  padding-bottom: 16px;
 }
 
 .inspector__meta { flex: 1; min-width: 0; }
@@ -1240,8 +1276,28 @@ a { color: inherit; text-decoration: none; }
     height: 28px;
   }
 
+  /* D-01 fix: Gateway full-width, remaining cards 2-col grid */
+  .runtime-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow-x: visible;
+  }
+
+  .runtime-grid::after {
+    display: none;
+  }
+
+  .runtime-grid .neon-card:first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* D-07 fix: mobile scene uses compact aspect to show all agents */
   .office-map {
-    aspect-ratio: 3 / 4; /* Taller scene on mobile */
+    aspect-ratio: 3 / 4;
+  }
+
+  .scene-bg__img {
+    object-position: center top;
   }
 
   .agent-sprite__character {
@@ -1268,6 +1324,12 @@ a { color: inherit; text-decoration: none; }
     max-width: 90px;
     font-size: 9px;
     padding: 4px 8px;
+  }
+
+  /* D-09 fix: mobile avatar stays proportional */
+  .inspector__avatar--lg {
+    flex: 0 0 64px;
+    height: 72px;
   }
 
   /* Inspector as bottom sheet */
@@ -1307,7 +1369,8 @@ a { color: inherit; text-decoration: none; }
   .runtime-grid { flex-wrap: wrap; }
   .neon-card { flex: 1 1 120px; }
 
-  .office-map { aspect-ratio: 16 / 10; }
+  /* D-03 fix: tablet scene fills viewport better */
+  .office-map { aspect-ratio: 16 / 12; }
 
   .mini-grid { grid-template-columns: repeat(4, 1fr); }
 
@@ -1346,14 +1409,15 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Reduced motion ── */
+/* D-04 fix: reduced motion uses static neon glow instead of removing border */
 @media (prefers-reduced-motion: reduce) {
   .office-grid { animation: none; }
   .office-light-beam { display: none; }
   .office-particles { display: none; }
-  .neon-card::before { animation: none; opacity: 0.3; }
-  .office-container::before { animation: none; opacity: 0.3; }
-  .inspector::before { animation: none; opacity: 0.3; }
-  .placeholder-card::before { animation: none; opacity: 0.3; }
+  .neon-card::before { animation: none; opacity: 0.5; background: conic-gradient(from 45deg, transparent 0%, var(--neon-color, var(--cyan)) 25%, transparent 50%); }
+  .office-container::before { animation: none; opacity: 0.5; background: conic-gradient(from 45deg, transparent 0%, var(--cyan) 12%, var(--blue) 25%, transparent 50%); }
+  .inspector::before { animation: none; opacity: 0.5; background: conic-gradient(from 45deg, transparent 0%, var(--cyan) 12%, var(--blue) 25%, transparent 50%); }
+  .placeholder-card::before { animation: none; opacity: 0.4; background: conic-gradient(from 45deg, transparent 0%, var(--blue) 25%, transparent 50%); }
   .connection-dot { animation: none; }
   .gateway-pulse { animation: none; }
   .agent-sprite__avatar { animation: none; }

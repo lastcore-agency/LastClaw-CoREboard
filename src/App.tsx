@@ -28,9 +28,6 @@ export default function App() {
         if (!alive) return;
         setAgents(agentData);
         setGateway(gatewayData);
-        if (agentData.length > 0) {
-          setSelectedId(agentData[0].id);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load');
       } finally {
