@@ -1,0 +1,95 @@
+/* ═══════════════════════════════════════════════════════════════
+   LastClaw-CoREboard – animations.css
+   Keyframes and animation utilities
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Neon border rotation ── */
+@keyframes neon-spin {
+  from { --neon-angle: 0deg; }
+  to   { --neon-angle: 360deg; }
+}
+
+@property --neon-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ── Gateway pulse ── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* ── Online status pulse ── */
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(34, 211, 238, 0.6)); }
+  50%      { box-shadow: 0 0 0 6px var(--pulse-color, rgba(34, 211, 238, 0)); }
+}
+
+/* ── Working typing dots ── */
+@keyframes typing-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40%           { opacity: 1;   transform: translateY(-3px); }
+}
+
+/* ── Busy amber pulse ── */
+@keyframes busy-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+/* ── Error flash ── */
+@keyframes error-flash {
+  0%, 100% { border-color: var(--red); }
+  50%      { border-color: transparent; }
+}
+
+/* ── Ambient grid scroll ── */
+@keyframes grid-scroll {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(24px, 24px); }
+}
+
+/* ── Particles drift ── */
+@keyframes particle-float {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-120px) translateX(30px); opacity: 0; }
+}
+
+/* ── Light beam sweep ── */
+@keyframes light-sweep {
+  0%   { transform: translateX(-100%) rotate(15deg); }
+  100% { transform: translateX(200%) rotate(15deg); }
+}
+
+/* ── Page entry ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Slide in from right (inspector) ── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Slide up (bottom sheet) ── */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

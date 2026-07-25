@@ -1,3 +1,8 @@
+/* ────────────────────────────────────────────────────────────
+   OpenClaw client library
+   Currently using mock data — will connect to real Gateway later
+   ──────────────────────────────────────────────────────────── */
+
 import { mockAgents, mockGateway } from '../data/mockAgents';
 import type { Agent, GatewaySnapshot } from '../types';
 

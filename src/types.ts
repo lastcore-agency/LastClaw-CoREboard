@@ -1,40 +1,61 @@
-export type AgentStatus = 'ONLINE' | 'WORKING' | 'BUSY' | 'OFFLINE';
+/* ────────────────────────────────────────────────────────────
+   Agent types for LastClaw-CoREboard
+   ──────────────────────────────────────────────────────────── */
 
-export type SkillToggle = {
+export type AgentStatus = 'online' | 'working' | 'busy' | 'waiting' | 'offline' | 'error';
+
+export type DataSource = 'MOCK' | 'LIVE' | 'CACHED';
+
+export interface SkillEntry {
   name: string;
+  description: string;
+  source: string;
   enabled: boolean;
-  installed: boolean;
-  healthy: boolean;
-};
+  permission: 'granted' | 'denied' | 'pending';
+  dependencyStatus: 'ok' | 'missing' | 'outdated';
+}
 
-export type Agent = {
+export interface Agent {
   id: string;
-  name: string;
-  room: string;
+  displayName: string;
   role: string;
-  model: string;
   status: AgentStatus;
-  task: string;
+  currentTask: string;
+  model: string;
   progress: number;
+  room: string;
+  avatar: string;
+  source: DataSource;
+  /* Visual Office position */
   x: number;
   y: number;
   bubble: string;
   color: string;
+  /* Extended fields */
   uptime: string;
   queue: string;
   latency: string;
   memory: string;
-  currentTaskLabel: string;
-  logs: string[];
-  telegramGroup: string;
-  telegramTopic: string;
-  skills: SkillToggle[];
-};
+  lastActive: string;
+  sessionId: string;
+  workspace: string;
+  recentActivity: string[];
+  runtimeHealth: 'healthy' | 'degraded' | 'unhealthy';
+  skills: SkillEntry[];
+}
 
-export type GatewaySnapshot = {
-  status: 'ONLINE' | 'OFFLINE';
+export type ConnectionState = 'connected' | 'degraded' | 'offline' | 'reconnecting';
+
+export interface GatewaySnapshot {
+  status: 'online' | 'offline';
   latency: string;
   cpu: string;
   ram: string;
   queue: string;
-};
+  sessions: number;
+  source: DataSource;
+}
+
+export type NavPage = 'center' | 'studio' | 'board' | 'chat' | 'settings';
+
+export type InspectorTab = 'status' | 'configure' | 'skills' | 'chat';
