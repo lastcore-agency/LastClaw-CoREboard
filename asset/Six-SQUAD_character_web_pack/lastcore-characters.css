@@ -1,0 +1,49 @@
+/* LastCoRE Character Web Pack - generated from 4x4 sprite sheets */
+:root { --lc-char-size: 125px; --lc-char-speed: 640ms; }
+.lc-character {
+  width: var(--lc-char-size);
+  height: var(--lc-char-size);
+  background-repeat: no-repeat;
+  background-size: calc(var(--lc-char-size) * 4) var(--lc-char-size);
+  image-rendering: auto;
+  display: inline-block;
+  pointer-events: none;
+  transform-origin: bottom center;
+  animation: lc-steps var(--lc-char-speed) steps(4) infinite;
+}
+.lc-character.paused { animation-play-state: paused; }
+.lc-character.static { animation: none; background-position: 0 0; }
+.lc-character.pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
+.lc-character.x2 { --lc-char-size: 250px; }
+.lc-character.small { --lc-char-size: 90px; }
+@keyframes lc-steps { from { background-position: 0 0; } to { background-position: calc(var(--lc-char-size) * -4) 0; } }
+/* altair */
+.lc-character.altair.front { background-image: url("spritesheets/altair-front.webp"); }
+.lc-character.altair.left { background-image: url("spritesheets/altair-left.webp"); }
+.lc-character.altair.right { background-image: url("spritesheets/altair-right.webp"); }
+.lc-character.altair.back { background-image: url("spritesheets/altair-back.webp"); }
+/* antares */
+.lc-character.antares.front { background-image: url("spritesheets/antares-front.webp"); }
+.lc-character.antares.left { background-image: url("spritesheets/antares-left.webp"); }
+.lc-character.antares.right { background-image: url("spritesheets/antares-right.webp"); }
+.lc-character.antares.back { background-image: url("spritesheets/antares-back.webp"); }
+/* capella */
+.lc-character.capella.front { background-image: url("spritesheets/capella-front.webp"); }
+.lc-character.capella.left { background-image: url("spritesheets/capella-left.webp"); }
+.lc-character.capella.right { background-image: url("spritesheets/capella-right.webp"); }
+.lc-character.capella.back { background-image: url("spritesheets/capella-back.webp"); }
+/* draco */
+.lc-character.draco.front { background-image: url("spritesheets/draco-front.webp"); }
+.lc-character.draco.left { background-image: url("spritesheets/draco-left.webp"); }
+.lc-character.draco.right { background-image: url("spritesheets/draco-right.webp"); }
+.lc-character.draco.back { background-image: url("spritesheets/draco-back.webp"); }
+/* polaris */
+.lc-character.polaris.front { background-image: url("spritesheets/polaris-front.webp"); }
+.lc-character.polaris.left { background-image: url("spritesheets/polaris-left.webp"); }
+.lc-character.polaris.right { background-image: url("spritesheets/polaris-right.webp"); }
+.lc-character.polaris.back { background-image: url("spritesheets/polaris-back.webp"); }
+/* sirius */
+.lc-character.sirius.front { background-image: url("spritesheets/sirius-front.webp"); }
+.lc-character.sirius.left { background-image: url("spritesheets/sirius-left.webp"); }
+.lc-character.sirius.right { background-image: url("spritesheets/sirius-right.webp"); }
+.lc-character.sirius.back { background-image: url("spritesheets/sirius-back.webp"); }

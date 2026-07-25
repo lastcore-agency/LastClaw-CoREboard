@@ -1,0 +1,148 @@
+{
+  "pack": "LastCoRE Character Web Pack",
+  "version": "1.0",
+  "frame_size": {
+    "width": 125,
+    "height": 125
+  },
+  "grid": {
+    "columns": 4,
+    "rows": 4
+  },
+  "frame_count_per_direction": 4,
+  "duration_ms_per_frame": 160,
+  "directions": {
+    "front": "หันหน้า / idle หรือเดินลง",
+    "left": "เดินซ้าย / side view A",
+    "right": "เดินขวา / side view B",
+    "back": "หันหลัง / เดินขึ้น"
+  },
+  "characters": {
+    "altair": {
+      "source": "source/altair.png",
+      "animations": {
+        "front": "animations/webp/altair-front.webp",
+        "left": "animations/webp/altair-left.webp",
+        "right": "animations/webp/altair-right.webp",
+        "back": "animations/webp/altair-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/altair-front.webp",
+        "left": "spritesheets/altair-left.webp",
+        "right": "spritesheets/altair-right.webp",
+        "back": "spritesheets/altair-back.webp"
+      },
+      "static": {
+        "front": "static/altair-front-static.webp",
+        "left": "static/altair-left-static.webp",
+        "right": "static/altair-right-static.webp",
+        "back": "static/altair-back-static.webp"
+      }
+    },
+    "antares": {
+      "source": "source/antares.png",
+      "animations": {
+        "front": "animations/webp/antares-front.webp",
+        "left": "animations/webp/antares-left.webp",
+        "right": "animations/webp/antares-right.webp",
+        "back": "animations/webp/antares-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/antares-front.webp",
+        "left": "spritesheets/antares-left.webp",
+        "right": "spritesheets/antares-right.webp",
+        "back": "spritesheets/antares-back.webp"
+      },
+      "static": {
+        "front": "static/antares-front-static.webp",
+        "left": "static/antares-left-static.webp",
+        "right": "static/antares-right-static.webp",
+        "back": "static/antares-back-static.webp"
+      }
+    },
+    "capella": {
+      "source": "source/capella.png",
+      "animations": {
+        "front": "animations/webp/capella-front.webp",
+        "left": "animations/webp/capella-left.webp",
+        "right": "animations/webp/capella-right.webp",
+        "back": "animations/webp/capella-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/capella-front.webp",
+        "left": "spritesheets/capella-left.webp",
+        "right": "spritesheets/capella-right.webp",
+        "back": "spritesheets/capella-back.webp"
+      },
+      "static": {
+        "front": "static/capella-front-static.webp",
+        "left": "static/capella-left-static.webp",
+        "right": "static/capella-right-static.webp",
+        "back": "static/capella-back-static.webp"
+      }
+    },
+    "draco": {
+      "source": "source/draco.png",
+      "animations": {
+        "front": "animations/webp/draco-front.webp",
+        "left": "animations/webp/draco-left.webp",
+        "right": "animations/webp/draco-right.webp",
+        "back": "animations/webp/draco-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/draco-front.webp",
+        "left": "spritesheets/draco-left.webp",
+        "right": "spritesheets/draco-right.webp",
+        "back": "spritesheets/draco-back.webp"
+      },
+      "static": {
+        "front": "static/draco-front-static.webp",
+        "left": "static/draco-left-static.webp",
+        "right": "static/draco-right-static.webp",
+        "back": "static/draco-back-static.webp"
+      }
+    },
+    "polaris": {
+      "source": "source/polaris.png",
+      "animations": {
+        "front": "animations/webp/polaris-front.webp",
+        "left": "animations/webp/polaris-left.webp",
+        "right": "animations/webp/polaris-right.webp",
+        "back": "animations/webp/polaris-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/polaris-front.webp",
+        "left": "spritesheets/polaris-left.webp",
+        "right": "spritesheets/polaris-right.webp",
+        "back": "spritesheets/polaris-back.webp"
+      },
+      "static": {
+        "front": "static/polaris-front-static.webp",
+        "left": "static/polaris-left-static.webp",
+        "right": "static/polaris-right-static.webp",
+        "back": "static/polaris-back-static.webp"
+      }
+    },
+    "sirius": {
+      "source": "source/sirius.png",
+      "animations": {
+        "front": "animations/webp/sirius-front.webp",
+        "left": "animations/webp/sirius-left.webp",
+        "right": "animations/webp/sirius-right.webp",
+        "back": "animations/webp/sirius-back.webp"
+      },
+      "spritesheets": {
+        "front": "spritesheets/sirius-front.webp",
+        "left": "spritesheets/sirius-left.webp",
+        "right": "spritesheets/sirius-right.webp",
+        "back": "spritesheets/sirius-back.webp"
+      },
+      "static": {
+        "front": "static/sirius-front-static.webp",
+        "left": "static/sirius-left-static.webp",
+        "right": "static/sirius-right-static.webp",
+        "back": "static/sirius-back-static.webp"
+      }
+    }
+  }
+}
