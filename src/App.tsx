@@ -82,63 +82,74 @@ export default function App() {
         <>
           <RuntimeSummary agents={agents} gateway={gateway} />
 
-          <main className={`app-main ${!showInspector ? 'app-main--no-inspector' : ''}`}>
-            <div>
-              <VisualOffice
-                agents={agents}
-                selectedId={selectedId}
-                onSelect={handleSelectAgent}
-              />
-            </div>
-
-            {showInspector && selectedAgent && (
-              <AgentInspector
-                agent={selectedAgent}
-                onClose={handleCloseInspector}
-              />
-            )}
+          <main className="app-main">
+            <VisualOffice
+              agents={agents}
+              selectedId={selectedId}
+              onSelect={handleSelectAgent}
+            />
           </main>
         </>
       )}
 
       {activePage === 'studio' && (
         <div className="placeholder-page">
-          <div className="placeholder-page__icon">⟨/⟩</div>
-          <div className="placeholder-page__title">Studio</div>
-          <div className="placeholder-page__desc">
-            Agent development workspace — coming in the next phase
+          <div className="placeholder-card">
+            <div className="placeholder-page__icon">⟨/⟩</div>
+            <div className="placeholder-page__title">Studio</div>
+            <div className="placeholder-page__desc">
+              Agent development workspace — coming in the next phase
+            </div>
+            <div className="mock-notice">⚠ MOCK — Placeholder</div>
           </div>
         </div>
       )}
 
       {activePage === 'board' && (
         <div className="placeholder-page">
-          <div className="placeholder-page__icon">📋</div>
-          <div className="placeholder-page__title">Board</div>
-          <div className="placeholder-page__desc">
-            Task board and project management — coming in the next phase
+          <div className="placeholder-card">
+            <div className="placeholder-page__icon">📋</div>
+            <div className="placeholder-page__title">Board</div>
+            <div className="placeholder-page__desc">
+              Task board and project management — coming in the next phase
+            </div>
+            <div className="mock-notice">⚠ MOCK — Placeholder</div>
           </div>
         </div>
       )}
 
       {activePage === 'chat' && (
         <div className="placeholder-page">
-          <div className="placeholder-page__icon">💬</div>
-          <div className="placeholder-page__title">Chat</div>
-          <div className="placeholder-page__desc">
-            Team chat with AI agents — coming in the next phase
+          <div className="placeholder-card">
+            <div className="placeholder-page__icon">💬</div>
+            <div className="placeholder-page__title">Chat</div>
+            <div className="placeholder-page__desc">
+              Team chat with AI agents — coming in the next phase
+            </div>
+            <div className="mock-notice">⚠ MOCK — Placeholder</div>
           </div>
         </div>
       )}
 
       {activePage === 'settings' && (
         <div className="placeholder-page">
-          <div className="placeholder-page__icon">⚙️</div>
-          <div className="placeholder-page__title">Settings</div>
-          <div className="placeholder-page__desc">
-            Configuration and preferences — coming in the next phase
+          <div className="placeholder-card">
+            <div className="placeholder-page__icon">⚙️</div>
+            <div className="placeholder-page__title">Settings</div>
+            <div className="placeholder-page__desc">
+              Configuration and preferences — coming in the next phase
+            </div>
+            <div className="mock-notice">⚠ MOCK — Placeholder</div>
           </div>
         </div>
+      )}
+
+      {/* Inspector is a fixed overlay — does NOT push document layout */}
+      {showInspector && selectedAgent && (
+        <AgentInspector
+          agent={selectedAgent}
+          onClose={handleCloseInspector}
+        />
       )}
 
       <BottomNavigation activePage={activePage} onNavigate={setActivePage} />

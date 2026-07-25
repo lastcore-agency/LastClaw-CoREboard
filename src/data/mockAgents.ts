@@ -3,7 +3,7 @@
    source: "MOCK" — all data is simulated
    ──────────────────────────────────────────────────────────── */
 
-import type { Agent, GatewaySnapshot } from '../types';
+import type { Agent, GatewaySnapshot, SceneConfig } from '../types';
 
 export const mockGateway: GatewaySnapshot = {
   status: 'online',
@@ -14,6 +14,24 @@ export const mockGateway: GatewaySnapshot = {
   sessions: 4,
   source: 'MOCK',
 };
+
+/** Scene configurations using real office assets */
+export const scenes: SceneConfig[] = [
+  {
+    id: 'agency-automation',
+    name: 'Agency Automation',
+    desktop: '/scenes/agency-automation-desktop.png',
+    mobile: '/scenes/agency-automation-mobile.png',
+    aspectRatio: { desktop: '1672 / 941', mobile: '1093 / 1438' },
+  },
+  {
+    id: 'office-2',
+    name: 'Office Pack 2',
+    desktop: '/scenes/office-2-desktop.png',
+    mobile: '/scenes/office-2-mobile.png',
+    aspectRatio: { desktop: '1448 / 1086', mobile: '1086 / 1448' },
+  },
+];
 
 export const mockAgents: Agent[] = [
   {
@@ -27,6 +45,16 @@ export const mockAgents: Agent[] = [
     progress: 68,
     x: 17,
     y: 24,
+    position: {
+      desktop: { x: 18, y: 38, scale: 1 },
+      tablet:  { x: 18, y: 36, scale: 0.9 },
+      mobile:  { x: 22, y: 30, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/sirius/idle-front.webp',
+      static: '/characters/sirius/static-front.webp',
+      direction: 'front',
+    },
     bubble: 'Analyzing requirements...',
     color: '#3b82f6',
     uptime: '2h 14m',
@@ -42,7 +70,7 @@ export const mockAgents: Agent[] = [
       '10:34:22 Running unit tests...',
     ],
     runtimeHealth: 'healthy',
-    avatar: '/characters/sirius.png',
+    avatar: '/characters/sirius/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Web Search', description: 'Search the web for information', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },
@@ -62,6 +90,16 @@ export const mockAgents: Agent[] = [
     progress: 52,
     x: 56,
     y: 22,
+    position: {
+      desktop: { x: 52, y: 32, scale: 1 },
+      tablet:  { x: 52, y: 30, scale: 0.9 },
+      mobile:  { x: 50, y: 26, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/draco/idle-front.webp',
+      static: '/characters/draco/static-front.webp',
+      direction: 'front',
+    },
     bubble: 'Refining responsive layout...',
     color: '#8b5cf6',
     uptime: '1h 03m',
@@ -77,7 +115,7 @@ export const mockAgents: Agent[] = [
       '10:47:01 Validating mobile breakpoints',
     ],
     runtimeHealth: 'healthy',
-    avatar: '/characters/draco.png',
+    avatar: '/characters/draco/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Browser Tool', description: 'Interact with browser for testing', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },
@@ -97,6 +135,16 @@ export const mockAgents: Agent[] = [
     progress: 31,
     x: 78,
     y: 22,
+    position: {
+      desktop: { x: 72, y: 32, scale: 1 },
+      tablet:  { x: 72, y: 30, scale: 0.9 },
+      mobile:  { x: 78, y: 26, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/polaris/idle-front.webp',
+      static: '/characters/polaris/static-front.webp',
+      direction: 'front',
+    },
     bubble: 'Queue stable.',
     color: '#06b6d4',
     uptime: '7h 42m',
@@ -112,7 +160,7 @@ export const mockAgents: Agent[] = [
       '10:00:00 No retry spikes',
     ],
     runtimeHealth: 'healthy',
-    avatar: '/characters/polaris.png',
+    avatar: '/characters/polaris/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Gateway Monitor', description: 'Monitor OpenClaw Gateway health', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },
@@ -132,6 +180,16 @@ export const mockAgents: Agent[] = [
     progress: 76,
     x: 17,
     y: 56,
+    position: {
+      desktop: { x: 18, y: 72, scale: 1 },
+      tablet:  { x: 18, y: 70, scale: 0.9 },
+      mobile:  { x: 22, y: 62, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/antares/idle-front.webp',
+      static: '/characters/antares/static-front.webp',
+      direction: 'front',
+    },
     bubble: 'Running test suite...',
     color: '#f59e0b',
     uptime: '55m',
@@ -147,7 +205,7 @@ export const mockAgents: Agent[] = [
       '10:42:15 2 flaky tests isolated',
     ],
     runtimeHealth: 'healthy',
-    avatar: '/characters/antares.png',
+    avatar: '/characters/antares/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Test Runner', description: 'Execute test suites and report results', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },
@@ -167,6 +225,16 @@ export const mockAgents: Agent[] = [
     progress: 43,
     x: 83,
     y: 58,
+    position: {
+      desktop: { x: 82, y: 72, scale: 1 },
+      tablet:  { x: 82, y: 70, scale: 0.9 },
+      mobile:  { x: 78, y: 62, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/altair/idle-front.webp',
+      static: '/characters/altair/static-front.webp',
+      direction: 'right',
+    },
     bubble: 'Deploying v1.2.0...',
     color: '#10b981',
     uptime: '3h 12m',
@@ -182,7 +250,7 @@ export const mockAgents: Agent[] = [
       '10:40:00 Waiting on smoke test',
     ],
     runtimeHealth: 'healthy',
-    avatar: '/characters/altair.png',
+    avatar: '/characters/altair/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Task Runner', description: 'Execute build and deploy tasks', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },
@@ -202,6 +270,16 @@ export const mockAgents: Agent[] = [
     progress: 0,
     x: 50,
     y: 48,
+    position: {
+      desktop: { x: 50, y: 55, scale: 1 },
+      tablet:  { x: 50, y: 53, scale: 0.9 },
+      mobile:  { x: 50, y: 48, scale: 0.8 },
+    },
+    character: {
+      animated: '/characters/capella/idle-front.webp',
+      static: '/characters/capella/static-front.webp',
+      direction: 'front',
+    },
     bubble: '',
     color: '#6366f1',
     uptime: '0m',
@@ -217,7 +295,7 @@ export const mockAgents: Agent[] = [
       '08:15:00 Completed market analysis',
     ],
     runtimeHealth: 'unhealthy',
-    avatar: '/characters/capella.png',
+    avatar: '/characters/capella/idle-front.webp',
     source: 'MOCK',
     skills: [
       { name: 'Web Search', description: 'Search the web for information', source: 'builtin', enabled: true, permission: 'granted', dependencyStatus: 'ok' },

@@ -15,6 +15,33 @@ export interface SkillEntry {
   dependencyStatus: 'ok' | 'missing' | 'outdated';
 }
 
+/** Responsive scene coordinate for each breakpoint */
+export interface BreakpointPosition {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+/** Agent position across responsive breakpoints */
+export interface AgentPosition {
+  desktop: BreakpointPosition;
+  tablet: BreakpointPosition;
+  mobile: BreakpointPosition;
+}
+
+/** Character animation direction */
+export type CharacterDirection = 'front' | 'left' | 'right' | 'back';
+
+/** Character animation state */
+export type CharacterAnimState = 'idle' | 'working';
+
+/** Character avatar paths */
+export interface CharacterAssets {
+  animated: string; // webp animated for idle
+  static: string;   // static webp for reduced-motion
+  direction: CharacterDirection;
+}
+
 export interface Agent {
   id: string;
   displayName: string;
@@ -26,9 +53,13 @@ export interface Agent {
   room: string;
   avatar: string;
   source: DataSource;
-  /* Visual Office position */
+  /* Visual Office position (legacy) */
   x: number;
   y: number;
+  /* Responsive positions */
+  position: AgentPosition;
+  /* Character assets */
+  character: CharacterAssets;
   bubble: string;
   color: string;
   /* Extended fields */
@@ -59,3 +90,12 @@ export interface GatewaySnapshot {
 export type NavPage = 'center' | 'studio' | 'board' | 'chat' | 'settings';
 
 export type InspectorTab = 'status' | 'configure' | 'skills' | 'chat';
+
+/** Scene configuration */
+export interface SceneConfig {
+  id: string;
+  name: string;
+  desktop: string;
+  mobile: string;
+  aspectRatio: { desktop: string; mobile: string };
+}

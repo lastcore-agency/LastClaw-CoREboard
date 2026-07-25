@@ -19,6 +19,12 @@ const models = ['GPT-4o', 'GPT-4.1', 'Claude 3.5', 'Claude 3.5 Sonnet', 'Gemini 
 export function AgentInspector({ agent, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<InspectorTab>('status');
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  // Save the trigger element for focus return
+  useEffect(() => {
+    triggerRef.current = document.activeElement as HTMLElement;
+  }, []);
 
   // Escape key handler
   const handleKeyDown = useCallback(
@@ -33,16 +39,31 @@ export function AgentInspector({ agent, onClose }: Props) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Focus trap for mobile (bottom sheet)
+  // Focus trap and auto-focus
   useEffect(() => {
     panelRef.current?.focus();
+    return () => {
+      // Return focus to the Agent button that was pressed
+      triggerRef.current?.focus();
+    };
+  }, []);
+
+  // Prevent body scroll when open on mobile
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    if (window.innerWidth < 960) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = original;
+    };
   }, []);
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Backdrop overlay */}
       <div
-        className="inspector-overlay"
+        className="inspector-backdrop"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -52,8 +73,8 @@ export function AgentInspector({ agent, onClose }: Props) {
         className="inspector"
         role="dialog"
         aria-label={`Inspector for ${agent.displayName}`}
+        aria-modal="true"
         tabIndex={-1}
-        style={{ position: 'relative' }}
       >
         {/* Mobile drag handle */}
         <div className="inspector__drag-handle" aria-hidden="true" />
@@ -71,7 +92,10 @@ export function AgentInspector({ agent, onClose }: Props) {
         {/* Agent header */}
         <div className="inspector__header">
           <div className="inspector__avatar">
-            <img src={agent.avatar} alt={agent.displayName} />
+            <img
+              src={agent.character.animated}
+              alt={agent.displayName}
+            />
           </div>
           <div className="inspector__meta">
             <div className="inspector__name-row">
