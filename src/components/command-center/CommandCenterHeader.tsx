@@ -1,10 +1,18 @@
-import type { ConnectionState } from '../../types';
+import type { ConnectionState, NavPage } from '../../types';
 import { motion } from 'framer-motion';
+import { LayoutSwitcher } from './LayoutSwitcher';
 
-interface Props { connectionState: ConnectionState; }
+type LayoutOrder = 'office-first' | 'status-first';
+
+interface Props {
+  connectionState: ConnectionState;
+  activePage: NavPage;
+  layoutOrder: LayoutOrder;
+  onLayoutChange: (order: LayoutOrder) => void;
+}
 const connectionLabels: Record<ConnectionState, string> = { connected: 'Connected', degraded: 'Degraded', offline: 'Offline', reconnecting: 'Reconnecting' };
 
-export function CommandCenterHeader({ connectionState }: Props) {
+export function CommandCenterHeader({ connectionState, activePage, layoutOrder, onLayoutChange }: Props) {
   return (
     <header className="app-header" role="banner">
       <div className="app-header__left">
@@ -29,6 +37,9 @@ export function CommandCenterHeader({ connectionState }: Props) {
         </div>
       </div>
       <div className="app-header__actions">
+        {activePage === 'center' && (
+          <LayoutSwitcher order={layoutOrder} onChange={onLayoutChange} />
+        )}
         <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="icon-btn" aria-label="Notifications" type="button">
           🔔<span className="notification-dot" aria-hidden="true" />
         </motion.button>

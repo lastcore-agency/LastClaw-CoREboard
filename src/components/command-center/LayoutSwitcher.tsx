@@ -19,23 +19,20 @@ export function LayoutSwitcher({ order, onChange }: Props) {
     return () => mql.removeEventListener('change', update);
   }, []);
 
+  const currentOrderText = order === 'office-first' ? 'Office First' : 'Status First';
+
   if (isMobile) {
     return (
-      <div className="layout-switcher-mobile">
-        <span className="layout-switcher-label">
-          {order === 'office-first' ? 'Office First' : 'Status First'}
-        </span>
-        <button
-          className="layout-switcher-btn-mobile premium-card"
-          onClick={() => onChange(order === 'office-first' ? 'status-first' : 'office-first')}
-          aria-label="Change Center section order"
-          aria-pressed={order === 'office-first'}
-          type="button"
-        >
-          <div className="premium-border-trail" aria-hidden="true" />
-          <span style={{ position: 'relative', zIndex: 1, fontSize: '18px' }}>⇅</span>
-        </button>
-      </div>
+      <button
+        className="icon-btn"
+        onClick={() => onChange(order === 'office-first' ? 'status-first' : 'office-first')}
+        aria-label={`Switch Center layout. Current order: ${currentOrderText}`}
+        aria-pressed={order === 'office-first'}
+        type="button"
+        style={{ color: 'var(--cyan)' }}
+      >
+        <span style={{ fontSize: '18px' }}>⇅</span>
+      </button>
     );
   }
 
@@ -43,7 +40,8 @@ export function LayoutSwitcher({ order, onChange }: Props) {
     <div
       className="layout-switcher-desktop premium-card"
       role="group"
-      aria-label="Change Center section order"
+      aria-label={`Switch Center layout. Current order: ${currentOrderText}`}
+      style={{ marginRight: '8px' }}
     >
       <div className="premium-border-trail" aria-hidden="true" />
       <button

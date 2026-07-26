@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent } from '../../types';
 import { scenes } from '../../data/mockAgents';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface Props { agents: Agent[]; selectedId: string; onSelect: (agentId: string) => void; }
 
@@ -21,6 +22,7 @@ function useHandoffDemo(agents: Agent[]) {
 }
 
 export function VisualOffice({ agents, selectedId, onSelect }: Props) {
+  const { businessName } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isMobile, setIsMobile] = useState(false);
@@ -50,9 +52,12 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
   return (
     <motion.section initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }} aria-label="Visual Office">
       <div className="office-toolbar">
-        <span className="office-toolbar__title">🏢 Agents Office</span>
+        <div className="office-toolbar__title" title={businessName}>
+          <span aria-hidden="true">🏢</span>
+          <span className="business-name-text">{businessName}</span>
+        </div>
         <div className="office-toolbar__actions">
-          <span className="toolbar-btn">{scene.name} <span className="source-badge source-badge--mock" style={{ marginLeft: 4 }}>⚠ MOCK</span></span>
+          <span className="toolbar-btn">SiX-SQUAD Automation <span className="source-badge source-badge--mock" style={{ marginLeft: 4 }}>⚠ MOCK</span></span>
           <button className="toolbar-btn" type="button" aria-label="Zoom out">−</button>
           <span className="toolbar-btn">100%</span>
           <button className="toolbar-btn" type="button" aria-label="Zoom in">+</button>
@@ -89,7 +94,7 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
                   <linearGradient id="handoff-grad" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0" />
                     <stop offset="50%" stopColor="var(--blue)" stopOpacity="1" />
-                    <stop offset="100%" stopColor="var(--purple)" stopOpacity="0" />
+                    <stop offset="100%" stopColor="var(--blue)" stopOpacity="0" />
                   </linearGradient>
                   <filter id="handoff-glow"><feGaussianBlur stdDeviation="1" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
                 </defs>
@@ -108,7 +113,7 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
                   <animateMotion dur="1.2s" repeatCount="indefinite" path={`M ${getAgentPos(handoff.from).x},${getAgentPos(handoff.from).y} L ${getAgentPos(handoff.to).x},${getAgentPos(handoff.to).y}`} />
                 </circle>
                 <circle cx={getAgentPos(handoff.from).x} cy={getAgentPos(handoff.from).y} r="2" fill="var(--cyan)" className="handoff-source-pulse" />
-                <circle cx={getAgentPos(handoff.to).x} cy={getAgentPos(handoff.to).y} r="2" fill="var(--purple)" className="handoff-dest-pulse" />
+                <circle cx={getAgentPos(handoff.to).x} cy={getAgentPos(handoff.to).y} r="2" fill="var(--blue)" className="handoff-dest-pulse" />
                 <text x={(getAgentPos(handoff.from).x + getAgentPos(handoff.to).x) / 2} y={Math.min(getAgentPos(handoff.from).y, getAgentPos(handoff.to).y) - 6} className="handoff-label" textAnchor="middle" fill="var(--cyan)" fontSize="1.8" opacity="0.9">
                   ⚠ MOCK
                 </text>

@@ -7,6 +7,7 @@ import { VisualOffice } from './components/visual-office/VisualOffice';
 import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
+import { SettingsPage } from './components/settings/SettingsPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
 
@@ -83,7 +84,12 @@ export default function App() {
       <div className="ambient-bg" aria-hidden="true" />
       <div className="ambient-grid" aria-hidden="true" />
 
-      <CommandCenterHeader connectionState={connectionState} />
+      <CommandCenterHeader
+        connectionState={connectionState}
+        activePage={activePage}
+        layoutOrder={layoutOrder}
+        onLayoutChange={setLayoutOrder}
+      />
       <TopNavigation activePage={activePage} onNavigate={setActivePage} />
 
       {error && (
@@ -95,10 +101,6 @@ export default function App() {
       <AnimatePresence mode="wait">
         {activePage === 'center' && gateway && (
           <motion.div key="center" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="page-container">
-            <div className="layout-switcher-container">
-              <LayoutSwitcher order={layoutOrder} onChange={setLayoutOrder} />
-            </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {layoutOrder === 'office-first' ? (
                 <>
@@ -127,7 +129,9 @@ export default function App() {
           </motion.div>
         )}
 
-        {['studio', 'board', 'chat', 'settings'].includes(activePage) && (
+        {activePage === 'settings' && <SettingsPage key="settings" />}
+
+        {['studio', 'board', 'chat'].includes(activePage) && (
           <motion.div key={activePage} variants={pageVariants} initial="initial" animate="animate" exit="exit" className="placeholder-page">
             <div className="placeholder-card premium-card">
               <div className="premium-border-trail" aria-hidden="true" />
@@ -135,7 +139,6 @@ export default function App() {
                 {activePage === 'studio' && '⟨/⟩'}
                 {activePage === 'board' && '📋'}
                 {activePage === 'chat' && '💬'}
-                {activePage === 'settings' && '⚙️'}
               </div>
               <div className="placeholder-page__title">{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</div>
               <div className="placeholder-page__desc">Module coming in next phase</div>
