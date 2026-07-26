@@ -19,14 +19,8 @@ export function CommandCenterHeader({ connectionState }: Props) {
           src="/logo/logo.png"
           alt="LastClaw-CoREboard logo"
           className="app-header__logo"
-          width={36}
-          height={36}
         />
         <div className="app-header__title-group">
-          <h1 className="app-title">
-            <span className="app-title__main">LastClaw-CoREboard</span>{' '}
-            <span className="app-title__sub">Command Center</span>
-          </h1>
           <span className={`connection-badge connection-badge--${connectionState}`}>
             <span className="connection-dot" aria-hidden="true" />
             {connectionLabels[connectionState]}
