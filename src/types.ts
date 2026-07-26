@@ -4,7 +4,7 @@
 
 export type AgentStatus = 'online' | 'working' | 'busy' | 'waiting' | 'offline' | 'error';
 
-export type DataSource = 'MOCK' | 'LIVE' | 'CACHED';
+export type DataSource = 'MOCK' | 'LIVE' | 'CACHED' | 'REAL' | 'FALLBACK' | 'EMPTY' | 'ERROR';
 
 export interface SkillEntry {
   name: string;

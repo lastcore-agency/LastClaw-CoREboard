@@ -4,9 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "dev:web": "vite",
+    "dev:api": "tsx watch server/index.ts",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "build:web": "vite build",
+    "build:api": "tsc -p tsconfig.server.json",
+    "build": "npm run build:web && npm run build:api",
+    "start": "node dist-server/index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",
@@ -14,10 +19,15 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.6.2",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^4.1.10"
   }
 }

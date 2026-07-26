@@ -8,3 +8,4 @@ __MACOSX/
 .vite/
 *.log
 *.tsbuildinfo
+dist-server
