@@ -3,7 +3,7 @@
    ──────────────────────────────────────────────────────────── */
 
 import { mockAgents, mockGateway } from "../data/mockAgents";
-import type { Agent, GatewaySnapshot, DataSource } from "../types";
+import type { Agent, GatewaySnapshot, DataSource, AgentStatus } from "../types";
 
 const apiBase = import.meta.env.VITE_OPENCLAW_API_BASE || "/api/runtime";
 const useMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
@@ -35,19 +35,24 @@ export async function fetchAgents(): Promise<Agent[]> {
     // 1. Process runtime agents
     const runtimeIds = new Set<string>();
     for (const rtAgent of runtimeAgents) {
-      runtimeIds.add(rtAgent.id);
-      const teamMatch = teamIdentity.find((a) => a.id === rtAgent.id);
+      const canonicalId = rtAgent.id === 'main' ? 'sirius' : rtAgent.id;
+      runtimeIds.add(canonicalId);
+      const teamMatch = teamIdentity.find((a) => a.id === canonicalId);
+
+      const rawStatus = (rtAgent.availability || "").toUpperCase();
+      let status: AgentStatus = "offline";
+      if (rawStatus === "WORKING") status = "working";
+      else if (rawStatus === "ONLINE") status = "online";
+      else if (rawStatus === "BUSY") status = "busy";
+      else if (rawStatus === "WAITING") status = "waiting";
+      else if (rawStatus === "OFFLINE") status = "offline";
+      else if (rawStatus === "ERROR") status = "error";
 
       if (teamMatch) {
         // Agent exists in team registry
         merged.push({
           ...teamMatch,
-          status:
-            rtAgent.availability === "ONLINE"
-              ? "online"
-              : rtAgent.availability === "WORKING"
-                ? "working"
-                : "online",
+          status,
           model: rtAgent.model || teamMatch.model,
           workspace: rtAgent.workspace || teamMatch.workspace,
           source: source,
@@ -55,10 +60,10 @@ export async function fetchAgents(): Promise<Agent[]> {
       } else {
         // Agent present in runtime but absent from Team registry -> neutral fallback identity
         merged.push({
-          id: rtAgent.id,
-          displayName: rtAgent.name || rtAgent.id,
+          id: canonicalId,
+          displayName: rtAgent.name || canonicalId,
           role: "Runtime Agent",
-          status: rtAgent.availability === "ONLINE" ? "online" : "online",
+          status,
           currentTask: "Awaiting tasks",
           model: rtAgent.model || "unknown",
           progress: 0,
@@ -94,7 +99,7 @@ export async function fetchAgents(): Promise<Agent[]> {
       if (!runtimeIds.has(teamAgent.id)) {
         merged.push({
           ...teamAgent,
-          status: "offline", // UNKNOWN logic mapping to UI: 'offline' with fallback/empty source
+          status: "offline",
           currentTask: "Unavailable",
           source: source === "LIVE" || source === "CACHED" ? "EMPTY" : source,
         });

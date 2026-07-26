@@ -52,7 +52,7 @@ export class OpenClawAdapter implements RuntimeAdapter {
         id: a.id,
         name: a.name,
         model: a.model || parsed?.agents?.defaults?.model || 'unknown',
-        workspace: a.workspace || parsed?.agents?.defaults?.workspace,
+        workspace: (a.workspace || parsed?.agents?.defaults?.workspace)?.replace(/^~(?=$|\/|\\)/, os.homedir()),
         bindings: a.bindings || [],
         availability: 'UNKNOWN'
       }));
@@ -240,7 +240,7 @@ export class OpenClawAdapter implements RuntimeAdapter {
           id: a.id,
           name: a.name,
           model: a.model,
-          workspace: a.workspace,
+          workspace: a.workspace ? a.workspace.replace(/^~(?=$|\/|\\)/, os.homedir()) : a.workspace,
           bindings: a.bindings,
           availability: a.availability || 'ONLINE'
         }));
@@ -249,7 +249,7 @@ export class OpenClawAdapter implements RuntimeAdapter {
           id: a.id,
           name: a.name,
           model: a.model,
-          workspace: a.workspace,
+          workspace: a.workspace ? a.workspace.replace(/^~(?=$|\/|\\)/, os.homedir()) : a.workspace,
           bindings: a.bindings,
           availability: a.availability || 'ONLINE'
         }));
