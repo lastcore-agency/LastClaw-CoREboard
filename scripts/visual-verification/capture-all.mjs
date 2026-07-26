@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 
-const OUT = 'artifacts/screenshots/visual-office-v2';
+const OUT = 'artifacts/screenshots/coreboard-modern-motion-v3';
 
 const viewports = [
   { name: 'desktop-1440x900',  w: 1440, h: 900,  dpr: 1 },

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CommandCenterHeader } from './components/command-center/CommandCenterHeader';
 import { RuntimeSummary } from './components/command-center/RuntimeSummary';
 import { AgentInspector } from './components/agents/AgentInspector';
@@ -7,6 +8,12 @@ import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
+
+const pageVariants = {
+  initial: { opacity: 0, y: 10, filter: 'blur(4px)', scale: 0.99 },
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', scale: 1, transition: { duration: 0.3, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -10, filter: 'blur(4px)', scale: 0.99, transition: { duration: 0.2, ease: 'easeIn' } }
+};
 
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -20,7 +27,6 @@ export default function App() {
 
   useEffect(() => {
     let alive = true;
-
     async function load() {
       try {
         setLoading(true);
@@ -34,120 +40,78 @@ export default function App() {
         if (alive) setLoading(false);
       }
     }
-
     void load();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  const selectedAgent = useMemo(
-    () => agents.find((a) => a.id === selectedId),
-    [agents, selectedId],
-  );
+  const selectedAgent = useMemo(() => agents.find((a) => a.id === selectedId), [agents, selectedId]);
 
   function handleSelectAgent(agentId: string) {
     setSelectedId(agentId);
     setShowInspector(true);
   }
 
-  function handleCloseInspector() {
-    setShowInspector(false);
-  }
-
   if (loading) {
     return (
       <div className="app-loading" role="status" aria-label="Loading">
-        <span>Loading LastClaw-CoREboard...</span>
+        <motion.span
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+        >
+          Initializing CoreBoard...
+        </motion.span>
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <CommandCenterHeader connectionState={connectionState} />
+      {/* Ambient background effects */}
+      <div className="ambient-bg" aria-hidden="true" />
+      <div className="ambient-grid" aria-hidden="true" />
 
+      <CommandCenterHeader connectionState={connectionState} />
       <TopNavigation activePage={activePage} onNavigate={setActivePage} />
 
       {error && (
-        <div className="app-banner" role="alert">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="app-banner" role="alert">
           {error}
-        </div>
+        </motion.div>
       )}
 
-      {activePage === 'center' && gateway && (
-        <>
-          <RuntimeSummary agents={agents} gateway={gateway} />
+      <AnimatePresence mode="wait">
+        {activePage === 'center' && gateway && (
+          <motion.div key="center" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="page-container">
+            <RuntimeSummary agents={agents} gateway={gateway} />
+            <main className="app-main">
+              <VisualOffice agents={agents} selectedId={selectedId} onSelect={handleSelectAgent} />
+            </main>
+          </motion.div>
+        )}
 
-          <main className="app-main">
-            <VisualOffice
-              agents={agents}
-              selectedId={selectedId}
-              onSelect={handleSelectAgent}
-            />
-          </main>
-        </>
-      )}
-
-      {activePage === 'studio' && (
-        <div className="placeholder-page">
-          <div className="placeholder-card">
-            <div className="placeholder-page__icon">⟨/⟩</div>
-            <div className="placeholder-page__title">Studio</div>
-            <div className="placeholder-page__desc">
-              Agent development workspace — coming in the next phase
+        {['studio', 'board', 'chat', 'settings'].includes(activePage) && (
+          <motion.div key={activePage} variants={pageVariants} initial="initial" animate="animate" exit="exit" className="placeholder-page">
+            <div className="placeholder-card premium-card">
+              <div className="premium-border-trail" aria-hidden="true" />
+              <div className="placeholder-page__icon">
+                {activePage === 'studio' && '⟨/⟩'}
+                {activePage === 'board' && '📋'}
+                {activePage === 'chat' && '💬'}
+                {activePage === 'settings' && '⚙️'}
+              </div>
+              <div className="placeholder-page__title">{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</div>
+              <div className="placeholder-page__desc">Module coming in next phase</div>
+              <div className="mock-notice">⚠ MOCK</div>
             </div>
-            <div className="mock-notice">⚠ MOCK — Placeholder</div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {activePage === 'board' && (
-        <div className="placeholder-page">
-          <div className="placeholder-card">
-            <div className="placeholder-page__icon">📋</div>
-            <div className="placeholder-page__title">Board</div>
-            <div className="placeholder-page__desc">
-              Task board and project management — coming in the next phase
-            </div>
-            <div className="mock-notice">⚠ MOCK — Placeholder</div>
-          </div>
-        </div>
-      )}
-
-      {activePage === 'chat' && (
-        <div className="placeholder-page">
-          <div className="placeholder-card">
-            <div className="placeholder-page__icon">💬</div>
-            <div className="placeholder-page__title">Chat</div>
-            <div className="placeholder-page__desc">
-              Team chat with AI agents — coming in the next phase
-            </div>
-            <div className="mock-notice">⚠ MOCK — Placeholder</div>
-          </div>
-        </div>
-      )}
-
-      {activePage === 'settings' && (
-        <div className="placeholder-page">
-          <div className="placeholder-card">
-            <div className="placeholder-page__icon">⚙️</div>
-            <div className="placeholder-page__title">Settings</div>
-            <div className="placeholder-page__desc">
-              Configuration and preferences — coming in the next phase
-            </div>
-            <div className="mock-notice">⚠ MOCK — Placeholder</div>
-          </div>
-        </div>
-      )}
-
-      {/* Inspector is a fixed overlay — does NOT push document layout */}
-      {showInspector && selectedAgent && (
-        <AgentInspector
-          agent={selectedAgent}
-          onClose={handleCloseInspector}
-        />
-      )}
+      <AnimatePresence>
+        {showInspector && selectedAgent && (
+          <AgentInspector agent={selectedAgent} onClose={() => setShowInspector(false)} />
+        )}
+      </AnimatePresence>
 
       <BottomNavigation activePage={activePage} onNavigate={setActivePage} />
     </div>
