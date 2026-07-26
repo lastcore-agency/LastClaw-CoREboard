@@ -7,6 +7,7 @@ import JSON5 from 'json5';
 import { env } from '../config/env.js';
 import { RuntimeAdapter } from './RuntimeAdapter.js';
 import { LastClawResponse, GatewayHealth, RuntimeAgent, DataSource } from './types.js';
+import { loadInstallationManifest, InstallationManifest } from '../config/manifest.js';
 
 export class OpenClawAdapter implements RuntimeAdapter {
   private cacheDir: string;
@@ -42,20 +43,49 @@ export class OpenClawAdapter implements RuntimeAdapter {
     }
   }
 
+  private mapToCanonicalAgents(rawAgents: any[], defaultModel?: string, defaultWorkspace?: string): RuntimeAgent[] {
+    const manifest = loadInstallationManifest();
+    return rawAgents.map(a => {
+      const runtimeAgentId = a.id;
+      let canonicalId = runtimeAgentId;
+
+      for (const [canonId, def] of Object.entries(manifest.agents)) {
+        if (def.runtimeAgentId === runtimeAgentId || (def.runtimeAliases && def.runtimeAliases.includes(runtimeAgentId))) {
+          canonicalId = canonId;
+          break;
+        }
+      }
+
+      let availability = 'UNKNOWN';
+      const rawAvailability = (a.availability || '').toUpperCase();
+      if (['WORKING', 'ONLINE', 'BUSY', 'WAITING', 'OFFLINE', 'ERROR'].includes(rawAvailability)) {
+        availability = rawAvailability;
+      }
+
+      const ws = a.workspace || defaultWorkspace;
+
+      return {
+        id: canonicalId,
+        canonicalId,
+        runtimeAgentId,
+        runtimeTarget: manifest.runtimeTarget,
+        runtimeKey: `${manifest.runtimeTarget}:${runtimeAgentId}`,
+        name: a.name,
+        model: a.model || defaultModel || 'unknown',
+        workspace: ws ? ws.replace(/^~(?=$|\/|\\)/, os.homedir()) : ws,
+        bindings: a.bindings || [],
+        availability
+      };
+    });
+  }
+
   private async readFallbackConfig(): Promise<{ source: DataSource; error?: any; agents?: RuntimeAgent[]; workspaces?: string[] }> {
     try {
       const content = await fs.promises.readFile(env.OPENCLAW_CONFIG_PATH, 'utf-8');
       const parsed = JSON5.parse(content);
       
       const agents = parsed?.agents?.list || [];
-      const mappedAgents: RuntimeAgent[] = agents.map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        model: a.model || parsed?.agents?.defaults?.model || 'unknown',
-        workspace: (a.workspace || parsed?.agents?.defaults?.workspace)?.replace(/^~(?=$|\/|\\)/, os.homedir()),
-        bindings: a.bindings || [],
-        availability: 'UNKNOWN'
-      }));
+      const mappedAgents: RuntimeAgent[] = this.mapToCanonicalAgents(agents, parsed?.agents?.defaults?.model, parsed?.agents?.defaults?.workspace);
 
       const workspaces = mappedAgents.map(a => a.workspace).filter(Boolean) as string[];
 
@@ -236,23 +266,9 @@ export class OpenClawAdapter implements RuntimeAdapter {
       const payload = await this.executeGatewayCommand<any>('agents.list');
       let agents: RuntimeAgent[] = [];
       if (Array.isArray(payload)) {
-        agents = payload.map(a => ({
-          id: a.id,
-          name: a.name,
-          model: a.model,
-          workspace: a.workspace ? a.workspace.replace(/^~(?=$|\/|\\)/, os.homedir()) : a.workspace,
-          bindings: a.bindings,
-          availability: a.availability || 'ONLINE'
-        }));
+        agents = this.mapToCanonicalAgents(payload);
       } else if (payload && payload.agents) {
-        agents = payload.agents.map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          model: a.model,
-          workspace: a.workspace ? a.workspace.replace(/^~(?=$|\/|\\)/, os.homedir()) : a.workspace,
-          bindings: a.bindings,
-          availability: a.availability || 'ONLINE'
-        }));
+        agents = this.mapToCanonicalAgents(payload.agents);
       }
       
       if (agents.length === 0) {

@@ -27,6 +27,10 @@ export interface GatewayHealth {
 
 export interface RuntimeAgent {
   id: string;
+  canonicalId: string;
+  runtimeAgentId: string;
+  runtimeTarget: string;
+  runtimeKey: string;
   name?: string;
   model?: string;
   workspace?: string;

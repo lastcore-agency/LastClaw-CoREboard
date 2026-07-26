@@ -35,7 +35,7 @@ export async function fetchAgents(): Promise<Agent[]> {
     // 1. Process runtime agents
     const runtimeIds = new Set<string>();
     for (const rtAgent of runtimeAgents) {
-      const canonicalId = rtAgent.id === 'main' ? 'sirius' : rtAgent.id;
+      const canonicalId = rtAgent.id;
       runtimeIds.add(canonicalId);
       const teamMatch = teamIdentity.find((a) => a.id === canonicalId);
 
