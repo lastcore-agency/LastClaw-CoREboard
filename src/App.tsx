@@ -7,7 +7,10 @@ import { VisualOffice } from './components/visual-office/VisualOffice';
 import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
+import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
+
+type LayoutOrder = 'office-first' | 'status-first';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10, filter: 'blur(4px)', scale: 0.99 },
@@ -24,6 +27,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [connectionState] = useState<ConnectionState>('connected');
+
+  const [layoutOrder, setLayoutOrder] = useState<LayoutOrder>(() => {
+    const saved = localStorage.getItem('coreboard:center-layout-order');
+    if (saved === 'office-first' || saved === 'status-first') return saved;
+    return 'office-first';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('coreboard:center-layout-order', layoutOrder);
+  }, [layoutOrder]);
 
   useEffect(() => {
     let alive = true;
@@ -82,10 +95,35 @@ export default function App() {
       <AnimatePresence mode="wait">
         {activePage === 'center' && gateway && (
           <motion.div key="center" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="page-container">
-            <RuntimeSummary agents={agents} gateway={gateway} />
-            <main className="app-main">
-              <VisualOffice agents={agents} selectedId={selectedId} onSelect={handleSelectAgent} />
-            </main>
+            <div className="layout-switcher-container">
+              <LayoutSwitcher order={layoutOrder} onChange={setLayoutOrder} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {layoutOrder === 'office-first' ? (
+                <>
+                  <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                    <main className="app-main">
+                      <VisualOffice agents={agents} selectedId={selectedId} onSelect={handleSelectAgent} />
+                    </main>
+                  </motion.div>
+                  <motion.div layout key="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                    <RuntimeSummary agents={agents} gateway={gateway} />
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  <motion.div layout key="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                    <RuntimeSummary agents={agents} gateway={gateway} />
+                  </motion.div>
+                  <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                    <main className="app-main">
+                      <VisualOffice agents={agents} selectedId={selectedId} onSelect={handleSelectAgent} />
+                    </main>
+                  </motion.div>
+                </>
+              )}
+            </div>
           </motion.div>
         )}
 

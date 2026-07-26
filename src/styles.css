@@ -164,6 +164,74 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .app-header__actions { display: flex; gap: 8px; }
 .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 18px; }
 
+/* ── Layout Switcher ── */
+.layout-switcher-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.layout-switcher-desktop {
+  display: flex;
+  padding: 4px;
+  gap: 2px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+
+.switcher-segment {
+  position: relative;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+}
+
+.switcher-segment.is-active {
+  color: var(--text-primary);
+}
+
+.switcher-pill {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.switcher-text {
+  position: relative;
+  z-index: 1;
+}
+
+.layout-switcher-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.layout-switcher-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.layout-switcher-btn-mobile {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+}
+
 /* ── Runtime Summary ── */
 .runtime-grid {
   display: flex;
