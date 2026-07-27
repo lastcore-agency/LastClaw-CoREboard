@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Agent } from '../../types';
+import type { Agent, GatewaySnapshot } from '../../types';
 import { scenes } from '../../data/mockAgents';
 import { useSettings } from '../../contexts/SettingsContext';
+import { SourceBadge } from '../ui/SourceBadge';
 
-interface Props { agents: Agent[]; selectedId: string; onSelect: (agentId: string) => void; }
+interface Props {
+  agents: Agent[];
+  gateway?: GatewaySnapshot | null;
+  selectedId: string;
+  onSelect: (id: string) => void;
+}
 
 const particles = Array.from({ length: 20 }, (_, i) => ({ left: `${(i * 37 + 13) % 100}%`, bottom: `${(i * 23 + 7) % 80}%`, delay: `${(i * 1.3) % 8}s`, duration: `${6 + (i % 4) * 2}s` }));
 
@@ -21,7 +27,7 @@ function useHandoffDemo(agents: Agent[]) {
   return handoff;
 }
 
-export function VisualOffice({ agents, selectedId, onSelect }: Props) {
+export function VisualOffice({ agents, gateway, selectedId, onSelect }: Props) {
   const { businessName } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
@@ -57,7 +63,7 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
           <span className="business-name-text">{businessName}</span>
         </div>
         <div className="office-toolbar__actions">
-          <span className="toolbar-btn">SiX-SQUAD Automation <span className="source-badge source-badge--mock" style={{ marginLeft: 4 }}>⚠ MOCK</span></span>
+          <span className="toolbar-btn">SiX-SQUAD Automation <span style={{ marginLeft: 4 }}><SourceBadge source={gateway?.source || 'EMPTY'} /></span></span>
           <button className="toolbar-btn" type="button" aria-label="Zoom out">−</button>
           <span className="toolbar-btn">100%</span>
           <button className="toolbar-btn" type="button" aria-label="Zoom in">+</button>
@@ -115,7 +121,7 @@ export function VisualOffice({ agents, selectedId, onSelect }: Props) {
                 <circle cx={getAgentPos(handoff.from).x} cy={getAgentPos(handoff.from).y} r="2" fill="var(--cyan)" className="handoff-source-pulse" />
                 <circle cx={getAgentPos(handoff.to).x} cy={getAgentPos(handoff.to).y} r="2" fill="var(--blue)" className="handoff-dest-pulse" />
                 <text x={(getAgentPos(handoff.from).x + getAgentPos(handoff.to).x) / 2} y={Math.min(getAgentPos(handoff.from).y, getAgentPos(handoff.to).y) - 6} className="handoff-label" textAnchor="middle" fill="var(--cyan)" fontSize="1.8" opacity="0.9">
-                  ⚠ MOCK
+                  HANDOFF
                 </text>
               </motion.svg>
             )}

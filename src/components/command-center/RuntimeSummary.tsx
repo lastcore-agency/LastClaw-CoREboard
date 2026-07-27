@@ -15,9 +15,13 @@ const item = {
 };
 
 export function RuntimeSummary({ agents, gateway }: Props) {
-  const online = agents.filter((a) => a.status === 'online' || a.status === 'working').length;
-  const busy = agents.filter((a) => a.status === 'busy').length;
-  const offline = agents.filter((a) => a.status === 'offline' || a.status === 'error').length;
+  // Only count known SiX-SQUAD canonical agents for team totals
+  const knownIds = ['sirius', 'draco', 'capella', 'antares', 'polaris', 'altair'];
+  const teamAgents = agents.filter((a) => knownIds.includes(a.id));
+  
+  const activeCount = teamAgents.filter((a) => ['online', 'working', 'busy', 'waiting'].includes(a.status)).length;
+  const busyCount = teamAgents.filter((a) => a.status === 'busy').length;
+  const offlineCount = teamAgents.filter((a) => ['offline', 'error'].includes(a.status)).length;
 
   return (
     <motion.section variants={container} initial="hidden" animate="show" className="runtime-grid" aria-label="Runtime summary">
@@ -34,22 +38,25 @@ export function RuntimeSummary({ agents, gateway }: Props) {
 
       <motion.div variants={item} style={{ display: 'contents' }}>
         <NeonCard variant="cyan">
-          <div className="status-card__label">Online</div>
-          <div className="status-card__value" style={{ color: 'var(--green)' }}>{online}</div>
+          <div className="status-card__label">{teamAgents.length} Agents</div>
+          <div className="status-card__value" style={{ color: 'var(--green)', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            {activeCount}
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cyan)' }}>Active</span>
+          </div>
         </NeonCard>
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>
-        <NeonCard variant="amber" active={busy > 0}>
+        <NeonCard variant="amber" active={busyCount > 0}>
           <div className="status-card__label">Busy</div>
-          <div className="status-card__value" style={{ color: 'var(--amber)' }}>{busy}</div>
+          <div className="status-card__value" style={{ color: 'var(--amber)' }}>{busyCount}</div>
         </NeonCard>
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>
-        <NeonCard variant="red" active={offline > 0}>
+        <NeonCard variant="red" active={offlineCount > 0}>
           <div className="status-card__label">Offline</div>
-          <div className="status-card__value" style={{ color: 'var(--red)' }}>{offline}</div>
+          <div className="status-card__value" style={{ color: 'var(--red)' }}>{offlineCount}</div>
         </NeonCard>
       </motion.div>
 

@@ -85,7 +85,7 @@ export default function App() {
       <div className="ambient-grid" aria-hidden="true" />
 
       <CommandCenterHeader
-        connectionState={connectionState}
+        gateway={gateway}
         activePage={activePage}
         layoutOrder={layoutOrder}
         onLayoutChange={setLayoutOrder}
@@ -142,7 +142,6 @@ export default function App() {
               </div>
               <div className="placeholder-page__title">{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</div>
               <div className="placeholder-page__desc">Module coming in next phase</div>
-              <div className="mock-notice">⚠ MOCK</div>
             </div>
           </motion.div>
         )}

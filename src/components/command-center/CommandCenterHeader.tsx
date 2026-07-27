@@ -1,18 +1,33 @@
-import type { ConnectionState, NavPage } from '../../types';
+import type { GatewaySnapshot, NavPage } from '../../types';
 import { motion } from 'framer-motion';
 import { LayoutSwitcher } from './LayoutSwitcher';
 
 type LayoutOrder = 'office-first' | 'status-first';
 
 interface Props {
-  connectionState: ConnectionState;
+  gateway?: GatewaySnapshot | null;
   activePage: NavPage;
   layoutOrder: LayoutOrder;
   onLayoutChange: (order: LayoutOrder) => void;
 }
-const connectionLabels: Record<ConnectionState, string> = { connected: 'Connected', degraded: 'Degraded', offline: 'Offline', reconnecting: 'Reconnecting' };
 
-export function CommandCenterHeader({ connectionState, activePage, layoutOrder, onLayoutChange }: Props) {
+export function CommandCenterHeader({ gateway, activePage, layoutOrder, onLayoutChange }: Props) {
+  let connectionState = 'offline';
+  let connectionLabel = 'OFFLINE';
+  
+  if (gateway) {
+    if (gateway.source === 'LIVE' && gateway.status === 'online') {
+      connectionState = 'connected';
+      connectionLabel = 'CONNECTED';
+    } else if (gateway.source === 'CACHED') {
+      connectionState = 'cached';
+      connectionLabel = 'CACHED';
+    } else if (gateway.source === 'FALLBACK') {
+      connectionState = 'degraded';
+      connectionLabel = 'DEGRADED';
+    }
+  }
+
   return (
     <header className="app-header" role="banner">
       <div className="app-header__left">
@@ -32,7 +47,7 @@ export function CommandCenterHeader({ connectionState, activePage, layoutOrder, 
             transition={{ delay: 0.2 }}
           >
             <span className="connection-dot" aria-hidden="true" />
-            {connectionLabels[connectionState]}
+            {connectionLabel}
           </motion.span>
         </div>
       </div>
