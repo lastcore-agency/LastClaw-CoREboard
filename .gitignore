@@ -9,3 +9,4 @@ __MACOSX/
 *.log
 *.tsbuildinfo
 dist-server
+artifacts/screenshots/live-runtime/
