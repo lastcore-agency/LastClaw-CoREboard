@@ -14,16 +14,17 @@ interface Props {
 
 const particles = Array.from({ length: 20 }, (_, i) => ({ left: `${(i * 37 + 13) % 100}%`, bottom: `${(i * 23 + 7) % 80}%`, delay: `${(i * 1.3) % 8}s`, duration: `${6 + (i % 4) * 2}s` }));
 
-function useHandoffDemo(agents: Agent[]) {
+function useHandoffDemo(agents: Agent[], enabled: boolean) {
   const [handoff, setHandoff] = useState<{ from: Agent; to: Agent } | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     const sirius = agents.find((a) => a.id === 'sirius');
     const draco = agents.find((a) => a.id === 'draco');
     if (!sirius || !draco) return;
     const timer = setInterval(() => { setHandoff({ from: sirius, to: draco }); setTimeout(() => setHandoff(null), 3500); }, 12000);
     const initial = setTimeout(() => { setHandoff({ from: sirius, to: draco }); setTimeout(() => setHandoff(null), 3500); }, 3000);
     return () => { clearInterval(timer); clearTimeout(initial); };
-  }, [agents]);
+  }, [agents, enabled]);
   return handoff;
 }
 
@@ -33,7 +34,8 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect }: Props) {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isMobile, setIsMobile] = useState(false);
   const scene = scenes[0];
-  const handoff = String(import.meta.env.VITE_USE_MOCK || "false") === "true" ? useHandoffDemo(agents) : null;
+  const isMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
+  const handoff = useHandoffDemo(agents, isMock);
   const visibleAgents = useMemo(() => agents.filter((a) => a.x > 0 && a.y > 0), [agents]);
 
   useEffect(() => {
