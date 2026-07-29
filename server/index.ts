@@ -17,7 +17,7 @@ app.use('/api/runtime', runtimeRouter);
 // Serve frontend in production
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd) {
-  const distPath = path.join(__dirname, '..', '..', 'dist');
+  const distPath = path.join(__dirname, '..', 'dist');
   app.use(express.static(distPath));
   
   app.get('{*splat}', (req, res) => {
