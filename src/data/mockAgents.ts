@@ -35,7 +35,7 @@ export const scenes: SceneConfig[] = [
 
 export const mockAgents: Agent[] = [
   {
-    id: 'main',
+    id: 'sirius',
     displayName: 'Sirius',
     room: 'HQ',
     role: 'Team Lead · Full-Stack Architect',

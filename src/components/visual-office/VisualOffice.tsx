@@ -17,7 +17,7 @@ const particles = Array.from({ length: 20 }, (_, i) => ({ left: `${(i * 37 + 13)
 function useHandoffDemo(agents: Agent[]) {
   const [handoff, setHandoff] = useState<{ from: Agent; to: Agent } | null>(null);
   useEffect(() => {
-    const sirius = agents.find((a) => a.id === 'main');
+    const sirius = agents.find((a) => a.id === 'sirius');
     const draco = agents.find((a) => a.id === 'draco');
     if (!sirius || !draco) return;
     const timer = setInterval(() => { setHandoff({ from: sirius, to: draco }); setTimeout(() => setHandoff(null), 3500); }, 12000);
