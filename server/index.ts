@@ -20,7 +20,7 @@ if (isProd) {
   const distPath = path.join(__dirname, '..', '..', 'dist');
   app.use(express.static(distPath));
   
-  app.get('*', (req, res) => {
+  app.get('{*splat}', (req, res) => {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ error: 'Not found' });
       return;
