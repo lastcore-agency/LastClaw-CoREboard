@@ -6,6 +6,7 @@ import { AgentInspector } from './components/agents/AgentInspector';
 import { VisualOffice } from './components/visual-office/VisualOffice';
 import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
@@ -149,7 +150,9 @@ export default function App() {
 
       <AnimatePresence>
         {showInspector && selectedAgent && (
-          <AgentInspector agent={selectedAgent} onClose={() => setShowInspector(false)} />
+          <ErrorBoundary>
+            <AgentInspector agent={selectedAgent} onClose={() => setShowInspector(false)} />
+          </ErrorBoundary>
         )}
       </AnimatePresence>
 

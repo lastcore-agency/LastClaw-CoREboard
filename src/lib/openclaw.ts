@@ -12,6 +12,16 @@ function wait(ms = 150) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Normalize a model field that may be a string or {primary, fallbacks} object */
+function normalizeModel(model: unknown): string {
+  if (!model) return '';
+  if (typeof model === 'string') return model;
+  if (typeof model === 'object' && model !== null && 'primary' in model) {
+    return String((model as { primary: unknown }).primary || '');
+  }
+  try { return JSON.stringify(model); } catch { return ''; }
+}
+
 export async function fetchAgents(): Promise<Agent[]> {
   if (useMock) {
     await wait();
@@ -53,7 +63,7 @@ export async function fetchAgents(): Promise<Agent[]> {
         merged.push({
           ...teamMatch,
           status,
-          model: rtAgent.model || teamMatch.model,
+          model: normalizeModel(rtAgent.model) || teamMatch.model,
           workspace: rtAgent.workspace || teamMatch.workspace,
           source: source,
         });
@@ -65,7 +75,7 @@ export async function fetchAgents(): Promise<Agent[]> {
           role: "Runtime Agent",
           status,
           currentTask: "Awaiting tasks",
-          model: rtAgent.model || "unknown",
+          model: normalizeModel(rtAgent.model) || "unknown",
           progress: 0,
           room: "unknown",
           avatar: "/avatar-fallback.webp",

@@ -466,3 +466,15 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .placeholder-page__title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 .placeholder-page__desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; }
 .mock-notice { font-size: 12px; font-weight: 600; color: var(--amber); background: var(--amber-dim); padding: 4px 12px; border-radius: 999px; }
+
+/* Error Boundary Fallback */
+.error-boundary-fallback { display: grid; place-items: center; min-height: 200px; padding: 24px; }
+.error-boundary-fallback__card { text-align: center; padding: 32px 24px; background: var(--bg-panel); border: 1px solid var(--border-mid); border-radius: 16px; max-width: 360px; }
+.error-boundary-fallback__icon { font-size: 36px; margin-bottom: 12px; opacity: 0.7; }
+.error-boundary-fallback__title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.error-boundary-fallback__message { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+.error-boundary-fallback__retry { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(0,229,255,0.2); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+.error-boundary-fallback__retry:hover { background: rgba(0,229,255,0.25); }
+
+/* Avatar Placeholder */
+.inspector__avatar-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); border-radius: 50%; font-size: 24px; font-weight: 800; color: var(--cyan); }
