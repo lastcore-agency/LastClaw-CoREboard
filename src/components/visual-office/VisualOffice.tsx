@@ -33,7 +33,7 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect }: Props) {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isMobile, setIsMobile] = useState(false);
   const scene = scenes[0];
-  const handoff = useHandoffDemo(agents);
+  const handoff = String(import.meta.env.VITE_USE_MOCK || "false") === "true" ? useHandoffDemo(agents) : null;
   const visibleAgents = useMemo(() => agents.filter((a) => a.x > 0 && a.y > 0), [agents]);
 
   useEffect(() => {
