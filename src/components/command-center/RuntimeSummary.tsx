@@ -37,11 +37,11 @@ export function RuntimeSummary({ agents, gateway }: Props) {
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>
-        <NeonCard variant="cyan">
+        <NeonCard variant="violet">
           <div className="status-card__label">{teamAgents.length} Agents</div>
           <div className="status-card__value" style={{ color: 'var(--green)', display: 'flex', alignItems: 'baseline', gap: 6 }}>
             {activeCount}
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cyan)' }}>Active</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--violet)' }}>Active</span>
           </div>
         </NeonCard>
       </motion.div>
@@ -61,7 +61,7 @@ export function RuntimeSummary({ agents, gateway }: Props) {
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>
-        <NeonCard variant="blue">
+        <NeonCard variant="violet">
           <div className="status-card__label">System Health</div>
           <div className="status-card__metrics">
             <span className="metric-chip">CPU {gateway.cpu}</span>

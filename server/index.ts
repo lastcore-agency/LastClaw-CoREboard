@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runtimeRouter } from './routes/runtime.js';
+import { eventStreamRouter } from './routes/events.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // API routes
 app.use('/api/runtime', runtimeRouter);
+app.use('/api/runtime', eventStreamRouter);
 
 // Serve frontend in production
 const isProd = process.env.NODE_ENV === 'production';

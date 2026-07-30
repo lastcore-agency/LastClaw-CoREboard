@@ -11,5 +11,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["server/**/*"]
+  "include": ["server/**/*"],
+  "exclude": [
+    "server/test/motion.test.ts",
+    "server/test/layout.test.ts",
+    "server/test/events.test.ts"
+  ]
 }

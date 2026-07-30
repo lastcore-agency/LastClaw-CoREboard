@@ -15,21 +15,35 @@ export const mockGateway: GatewaySnapshot = {
   source: 'MOCK',
 };
 
-/** Scene configurations using real office assets */
+/** Scene configurations with AVIF/WebP/PNG picture sources */
 export const scenes: SceneConfig[] = [
   {
-    id: 'agency-automation',
+    id: 'office-1',
     name: 'Agency Automation',
-    desktop: '/scenes/agency-automation-desktop.png',
-    mobile: '/scenes/agency-automation-mobile.png',
-    aspectRatio: { desktop: '1672 / 941', mobile: '1093 / 1438' },
+    desktop: '/scenes/office-1-desktop.png',
+    mobile: '/scenes/office-1-mobile.png',
+    aspectRatio: { desktop: '16/9', mobile: '3/4' },
   },
   {
     id: 'office-2',
     name: 'Office Pack 2',
     desktop: '/scenes/office-2-desktop.png',
     mobile: '/scenes/office-2-mobile.png',
-    aspectRatio: { desktop: '1448 / 1086', mobile: '1086 / 1448' },
+    aspectRatio: { desktop: '16/9', mobile: '3/4' },
+  },
+  {
+    id: 'office-3',
+    name: 'Operations Hub',
+    desktop: '/scenes/office-3-desktop.png',
+    mobile: '/scenes/office-3-mobile.png',
+    aspectRatio: { desktop: '16/9', mobile: '3/4' },
+  },
+  {
+    id: 'office-4',
+    name: 'Command Center',
+    desktop: '/scenes/office-4-desktop.png',
+    mobile: '/scenes/office-4-mobile.png',
+    aspectRatio: { desktop: '16/9', mobile: '3/4' },
   },
 ];
 

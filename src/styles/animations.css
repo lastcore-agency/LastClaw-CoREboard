@@ -1,15 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
    LastClaw-CoREboard – animations.css
-   Keyframes and animation utilities
+   Violet-glass keyframes and animation utilities
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Neon border rotation ── */
-@keyframes neon-spin {
-  from { --neon-angle: 0deg; }
-  to   { --neon-angle: 360deg; }
-}
-
-@property --neon-angle {
+/* ── Angle property for conic border trail ── */
+@property --angle {
   syntax: "<angle>";
   initial-value: 0deg;
   inherits: false;
@@ -23,8 +18,8 @@
 
 /* ── Online status pulse ── */
 @keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(34, 211, 238, 0.6)); }
-  50%      { box-shadow: 0 0 0 6px var(--pulse-color, rgba(34, 211, 238, 0)); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(168, 85, 247, 0.5)); }
+  50%      { box-shadow: 0 0 0 6px var(--pulse-color, rgba(168, 85, 247, 0)); }
 }
 
 /* ── Working typing dots ── */
@@ -86,12 +81,12 @@
 /* ── Selection pulse ring ── */
 @keyframes selection-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5),
-                0 0 12px rgba(34, 211, 238, 0.2);
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.45),
+                0 0 12px rgba(168, 85, 247, 0.18);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(34, 211, 238, 0),
-                0 0 20px rgba(34, 211, 238, 0.1);
+    box-shadow: 0 0 0 8px rgba(168, 85, 247, 0),
+                0 0 20px rgba(168, 85, 247, 0.08);
   }
 }
 
@@ -101,13 +96,13 @@
   50%      { transform: translateY(-2px); }
 }
 
-/* ── Agent working bob (faster) ── */
+/* ── Agent working bob ── */
 @keyframes agent-working-bob {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-3px); }
 }
 
-/* ── Light path dash animation ── */
+/* ── Light path dash ── */
 @keyframes dash-flow {
   to { stroke-dashoffset: -20; }
 }
@@ -132,23 +127,39 @@
 
 /* ── Nav active indicator ── */
 @keyframes nav-indicator-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
-  50%      { box-shadow: 0 0 16px rgba(59, 130, 246, 0.5); }
+  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.25); }
+  50%      { box-shadow: 0 0 16px rgba(168, 85, 247, 0.4); }
 }
 
 /* ── Gradient glow following pointer ── */
 @keyframes pointer-glow-pulse {
-  0%, 100% { opacity: 0.15; }
-  50%      { opacity: 0.25; }
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 0.22; }
 }
 
-/* ── Reduced motion ── */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+/* ── Border trail pulse for scene change ── */
+@keyframes trail-highlight {
+  0%   { opacity: 0.15; }
+  50%  { opacity: 0.65; }
+  100% { opacity: 0.28; }
+}
+
+/* ── Agent walk cycle ── */
+@keyframes walk-bounce {
+  0%, 100% { transform: translateY(0); }
+  25%      { transform: translateY(-3px); }
+  75%      { transform: translateY(-1px); }
+}
+
+/* ── Drag lift ── */
+@keyframes drag-lift {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to   { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.3)); }
+}
+
+/* ── Drop settle ── */
+@keyframes drop-settle {
+  0%   { transform: translate(-50%, -50%) scale(1.15); }
+  60%  { transform: translate(-50%, -50%) scale(0.95); }
+  100% { transform: translate(-50%, -50%) scale(1); }
 }

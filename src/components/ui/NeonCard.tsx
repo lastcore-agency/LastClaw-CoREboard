@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
-type NeonVariant = 'cyan' | 'blue' | 'green' | 'amber' | 'red' | 'purple';
+type NeonVariant = 'violet' | 'cyan' | 'blue' | 'green' | 'amber' | 'red' | 'purple';
 
 interface Props {
   children: ReactNode;
@@ -13,7 +13,7 @@ interface Props {
   'aria-label'?: string;
 }
 
-export function NeonCard({ children, variant = 'cyan', selected = false, active = false, className = '', onClick, ...rest }: Props) {
+export function NeonCard({ children, variant = 'violet', selected = false, active = false, className = '', onClick, ...rest }: Props) {
   const classes = ['premium-card', `premium-card--${variant}`, selected ? 'is-selected' : '', active ? 'is-active' : '', className].filter(Boolean).join(' ');
 
   const content = (

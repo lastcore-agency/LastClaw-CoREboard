@@ -8,6 +8,7 @@ import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
+import { useAgentEvents } from './lib/useAgentEvents';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
@@ -29,6 +30,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [connectionState] = useState<ConnectionState>('connected');
+
+  const isMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
+  const { bubbles } = useAgentEvents(isMock);
 
   const [layoutOrder, setLayoutOrder] = useState<LayoutOrder>(() => {
     const saved = localStorage.getItem('coreboard:center-layout-order');
@@ -107,7 +111,7 @@ export default function App() {
                 <>
                   <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
                     <main className="app-main">
-                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} />
+                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
                     </main>
                   </motion.div>
                   <motion.div layout key="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
@@ -121,7 +125,7 @@ export default function App() {
                   </motion.div>
                   <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
                     <main className="app-main">
-                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} />
+                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
                     </main>
                   </motion.div>
                 </>
