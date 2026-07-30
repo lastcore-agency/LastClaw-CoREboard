@@ -27,6 +27,11 @@ if (isProd) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
+    // Don't serve index.html for missing asset requests — return 404 instead
+    if (path.extname(req.path)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }

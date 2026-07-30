@@ -59,15 +59,13 @@ function ScenePicture({ scene, variant, isMobile }: { scene: SceneConfig; varian
   const webpPath = basePath.replace('.png', '.webp');
   const shouldLoad = isMobile ? variant === 'mobile' : variant === 'desktop';
 
+  if (!shouldLoad) return null;
+
   return (
     <picture className="scene-bg">
-      {shouldLoad && (
-        <>
-          <source type="image/avif" srcSet={avifPath} media={variant === 'mobile' ? '(max-width: 767px)' : '(min-width: 768px)'} />
-          <source type="image/webp" srcSet={webpPath} media={variant === 'mobile' ? '(max-width: 767px)' : '(min-width: 768px)'} />
-        </>
-      )}
-      <img src={basePath} alt={`${scene.name} scene`} className="scene-bg__img" loading={shouldLoad ? 'eager' : 'lazy'} draggable={false} width={variant === 'desktop' ? 1600 : 800} height={variant === 'desktop' ? 900 : 1200} />
+      <source type="image/avif" srcSet={avifPath} media={variant === 'mobile' ? '(max-width: 767px)' : '(min-width: 768px)'} />
+      <source type="image/webp" srcSet={webpPath} media={variant === 'mobile' ? '(max-width: 767px)' : '(min-width: 768px)'} />
+      <img src={basePath} alt={`${scene.name} scene`} className="scene-bg__img" loading="eager" draggable={false} width={variant === 'desktop' ? 1600 : 800} height={variant === 'desktop' ? 900 : 1200} />
     </picture>
   );
 }
