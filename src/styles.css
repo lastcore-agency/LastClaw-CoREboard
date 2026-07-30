@@ -308,7 +308,6 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .toolbar-btn { font-size: 11px; font-weight: 500; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 4px 8px; border-radius: var(--radius-sm); color: var(--text-secondary); }
 
 .office-container {
-  aspect-ratio: 16/9;
   position: relative;
   border-radius: var(--radius-xl);
   background: #020108;
@@ -475,7 +474,6 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
   .runtime-grid { display: grid; grid-template-columns: 1fr 1fr; }
   .runtime-grid > :first-child { grid-column: 1 / -1; }
 
-  .office-container { aspect-ratio: 3/4; }
   .agent-sprite { width: 48px; height: 48px; }
 
   .inspector { top: auto; bottom: 0; left: 0; right: 0; max-height: 85vh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }

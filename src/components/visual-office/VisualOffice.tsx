@@ -244,7 +244,7 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
         className={`premium-card office-container${editMode ? ' office-container--editing' : ''}`}
         ref={containerRef}
         onMouseMove={handleMouseMove}
-        style={editMode ? { cursor: dragging ? 'grabbing' : 'default' } : undefined}
+        style={{ aspectRatio: isMobile ? scene.aspectRatio.mobile : scene.aspectRatio.desktop, ...(editMode ? { cursor: dragging ? 'grabbing' : 'default' } : {}) }}
       >
         <div className="premium-border-trail" aria-hidden="true" />
         <div className="office-map" role="img" aria-label={`Office scene: ${scene.name}${editMode ? ' (edit mode)' : ''}`}>

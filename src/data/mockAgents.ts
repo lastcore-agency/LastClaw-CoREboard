@@ -29,21 +29,21 @@ export const scenes: SceneConfig[] = [
     name: 'Office Pack 2',
     desktop: '/scenes/office-2-desktop.png',
     mobile: '/scenes/office-2-mobile.png',
-    aspectRatio: { desktop: '16/9', mobile: '3/4' },
+    aspectRatio: { desktop: '4/3', mobile: '3/4' },
   },
   {
     id: 'office-3',
     name: 'Operations Hub',
     desktop: '/scenes/office-3-desktop.png',
     mobile: '/scenes/office-3-mobile.png',
-    aspectRatio: { desktop: '16/9', mobile: '3/4' },
+    aspectRatio: { desktop: '4/3', mobile: '3/4' },
   },
   {
     id: 'office-4',
     name: 'Command Center',
     desktop: '/scenes/office-4-desktop.png',
     mobile: '/scenes/office-4-mobile.png',
-    aspectRatio: { desktop: '16/9', mobile: '3/4' },
+    aspectRatio: { desktop: '4/3', mobile: '3/4' },
   },
 ];
 
