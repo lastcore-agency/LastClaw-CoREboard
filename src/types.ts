@@ -2,7 +2,7 @@
    Agent types for LastClaw-CoREboard
    ──────────────────────────────────────────────────────────── */
 
-export type AgentStatus = 'online' | 'working' | 'busy' | 'waiting' | 'offline' | 'error';
+export type AgentStatus = 'online' | 'working' | 'busy' | 'waiting' | 'offline' | 'error' | 'unknown';
 
 export type DataSource = 'MOCK' | 'LIVE' | 'CACHED' | 'REAL' | 'FALLBACK' | 'EMPTY' | 'ERROR';
 

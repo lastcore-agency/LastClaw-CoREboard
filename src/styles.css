@@ -351,6 +351,7 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .agent-sprite__status-dot--online { background: var(--green); }
 .agent-sprite__status-dot--working { background: var(--violet); box-shadow: 0 0 8px var(--violet-glow); }
 .agent-sprite__status-dot--offline { background: var(--text-muted); }
+.agent-sprite__status-dot--unknown { background: #d97706; }
 
 /* Agent selection: violet edge glow + bloom */
 .agent-selection-glow {

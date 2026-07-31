@@ -330,6 +330,7 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
                   isSelected && !editMode ? 'agent-sprite--selected' : '',
                   agent.status === 'offline' ? 'agent-sprite--offline' : '',
                   agent.status === 'working' ? 'agent-sprite--working' : '',
+                  agent.status === 'unknown' ? 'agent-sprite--unknown' : '',
                 ].filter(Boolean).join(' ')}
                 onClick={() => handleAgentClick(agent.id)}
                 onPointerDown={editMode ? (e) => handleAgentPointerDown(e, agent.id) : undefined}

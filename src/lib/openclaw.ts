@@ -50,7 +50,7 @@ export async function fetchAgents(): Promise<Agent[]> {
       const teamMatch = teamIdentity.find((a) => a.id === canonicalId);
 
       const rawStatus = (rtAgent.availability || "").toUpperCase();
-      let status: AgentStatus = "offline";
+      let status: AgentStatus = "unknown";
       if (rawStatus === "WORKING") status = "working";
       else if (rawStatus === "ONLINE") status = "online";
       else if (rawStatus === "BUSY") status = "busy";

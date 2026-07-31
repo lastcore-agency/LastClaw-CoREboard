@@ -61,6 +61,7 @@ export function deriveMotionState(agent: Agent, isMock: boolean): AgentMotionSta
   if (agent.status === 'online') return 'idle';
   if (agent.status === 'busy') return 'atDesk';
   if (agent.status === 'waiting') return 'idle';
+  if (agent.status === 'unknown') return 'atDesk';
   return 'unknown';
 }
 

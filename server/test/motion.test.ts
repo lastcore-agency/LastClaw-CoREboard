@@ -66,6 +66,12 @@ describe('deriveMotionState', () => {
     expect(deriveMotionState(agent, true)).toBe('unknown');
   });
 
+  it('returns atDesk for unknown agents in live mode (not offline)', () => {
+    const agent = makeAgent({ status: 'unknown' });
+    expect(deriveMotionState(agent, false)).toBe('atDesk');
+    expect(deriveMotionState(agent, true)).toBe('atDesk');
+  });
+
   it('returns atDesk for working agents (mock)', () => {
     const agent = makeAgent({ status: 'working' });
     expect(deriveMotionState(agent, true)).toBe('atDesk');
