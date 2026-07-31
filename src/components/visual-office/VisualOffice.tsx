@@ -115,7 +115,7 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
   }, [isMobile]);
 
   const parallaxStyle = isMobile ? {} : { transform: `translate(${(mousePos.x - 0.5) * -8}px, ${(mousePos.y - 0.5) * -8}px)` };
-  const bgParallaxStyle = isMobile ? {} : { transform: `translate(${(mousePos.x - 0.5) * -4}px, ${(mousePos.y - 0.5) * -4}px) scale(1.03)` };
+  const bgParallaxStyle = { position: 'absolute' as const, inset: 0, width: '100%', height: '100%', ...(isMobile ? {} : { transform: `translate(${(mousePos.x - 0.5) * -4}px, ${(mousePos.y - 0.5) * -4}px) scale(1.03)` }) };
 
   function getAgentPos(agent: Agent) {
     if (!editMode) return isMobile ? agent.position.mobile : agent.position.desktop;
