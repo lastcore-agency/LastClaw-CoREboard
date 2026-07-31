@@ -15,6 +15,7 @@
   "exclude": [
     "server/test/motion.test.ts",
     "server/test/layout.test.ts",
-    "server/test/events.test.ts"
+    "server/test/events.test.ts",
+    "server/test/unknown-status.test.ts"
   ]
 }

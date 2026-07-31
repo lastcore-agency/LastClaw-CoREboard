@@ -296,6 +296,9 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .gateway-pulse { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .gateway-pulse--online { background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse-dot 2s infinite; }
 
+/* Unknown status card */
+.status-card__value--unknown { color: #7c8594; }
+
 /* ── Visual Office ── */
 .office-toolbar { display: flex; justify-content: space-between; padding: 0 4px 12px; position: relative; z-index: var(--z-base); gap: 8px; }
 .office-toolbar__title {
@@ -351,7 +354,24 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .agent-sprite__status-dot--online { background: var(--green); }
 .agent-sprite__status-dot--working { background: var(--violet); box-shadow: 0 0 8px var(--violet-glow); }
 .agent-sprite__status-dot--offline { background: var(--text-muted); }
-.agent-sprite__status-dot--unknown { background: #d97706; }
+.agent-sprite__status-dot--unknown { background: #7c8594; box-shadow: 0 0 6px rgba(124, 133, 148, 0.3); }
+
+/* Agent sprite status variants */
+.agent-sprite--offline { opacity: 0.45; filter: grayscale(0.6) brightness(0.7); }
+.agent-sprite--unknown { opacity: 0.75; filter: saturate(0.5) brightness(0.85); }
+
+/* Agent status ring */
+.agent-status-ring {
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid transparent; pointer-events: none;
+}
+.agent-status-ring--online { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 8px rgba(16, 185, 129, 0.2); }
+.agent-status-ring--working { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
+.agent-status-ring--busy { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 8px rgba(245, 158, 11, 0.2); }
+.agent-status-ring--waiting { border-color: rgba(34, 211, 238, 0.4); box-shadow: 0 0 8px rgba(34, 211, 238, 0.15); }
+.agent-status-ring--offline { border-color: rgba(107, 95, 138, 0.3); }
+.agent-status-ring--unknown { border-color: rgba(124, 133, 148, 0.4); box-shadow: 0 0 6px rgba(124, 133, 148, 0.15); }
+.agent-status-ring--error { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 8px rgba(239, 68, 68, 0.2); }
 
 /* Agent selection: violet edge glow + bloom */
 .agent-selection-glow {
@@ -412,6 +432,13 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 .inspector__name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .inspector__name { font-size: 18px; font-weight: 700; }
 .status-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: var(--violet-dim); color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.2); }
+.status-badge--online { background: var(--green-dim); color: var(--green); border-color: rgba(16, 185, 129, 0.25); }
+.status-badge--working { background: var(--violet-dim); color: var(--violet); border-color: rgba(168, 85, 247, 0.25); }
+.status-badge--busy { background: var(--amber-dim); color: var(--amber); border-color: rgba(245, 158, 11, 0.25); }
+.status-badge--waiting { background: var(--cyan-dim); color: var(--cyan); border-color: rgba(34, 211, 238, 0.25); }
+.status-badge--offline { background: rgba(107, 95, 138, 0.12); color: var(--text-muted); border-color: rgba(107, 95, 138, 0.2); }
+.status-badge--unknown { background: rgba(124, 133, 148, 0.1); color: #7c8594; border-color: rgba(124, 133, 148, 0.25); }
+.status-badge--error { background: var(--red-dim); color: var(--red); border-color: rgba(239, 68, 68, 0.25); }
 .inspector__agent-id { font-size: 11px; color: var(--text-muted); font-family: monospace; }
 .inspector__role { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
 

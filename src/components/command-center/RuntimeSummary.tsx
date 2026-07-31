@@ -22,6 +22,7 @@ export function RuntimeSummary({ agents, gateway }: Props) {
   const activeCount = teamAgents.filter((a) => ['online', 'working', 'busy', 'waiting'].includes(a.status)).length;
   const busyCount = teamAgents.filter((a) => a.status === 'busy').length;
   const offlineCount = teamAgents.filter((a) => ['offline', 'error'].includes(a.status)).length;
+  const unknownCount = teamAgents.filter((a) => a.status === 'unknown').length;
 
   return (
     <motion.section variants={container} initial="hidden" animate="show" className="runtime-grid" aria-label="Runtime summary">
@@ -54,10 +55,17 @@ export function RuntimeSummary({ agents, gateway }: Props) {
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>
-        <NeonCard variant="red" active={offlineCount > 0}>
-          <div className="status-card__label">Offline</div>
-          <div className="status-card__value" style={{ color: 'var(--red)' }}>{offlineCount}</div>
-        </NeonCard>
+        {unknownCount > 0 && offlineCount === 0 ? (
+          <NeonCard variant="violet" active={unknownCount > 0}>
+            <div className="status-card__label">Status Unavailable</div>
+            <div className="status-card__value status-card__value--unknown">{unknownCount}</div>
+          </NeonCard>
+        ) : offlineCount > 0 ? (
+          <NeonCard variant="red" active={offlineCount > 0}>
+            <div className="status-card__label">Offline</div>
+            <div className="status-card__value" style={{ color: 'var(--red)' }}>{offlineCount}</div>
+          </NeonCard>
+        ) : null}
       </motion.div>
 
       <motion.div variants={item} style={{ display: 'contents' }}>

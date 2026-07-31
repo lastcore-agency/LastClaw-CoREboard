@@ -22,6 +22,18 @@ function normalizeModel(model: unknown): string {
   try { return JSON.stringify(model); } catch { return ''; }
 }
 
+/** Map a raw availability string from the gateway to a canonical AgentStatus */
+export function mapAvailabilityToStatus(raw: string | undefined | null): AgentStatus {
+  const up = (raw || '').toUpperCase();
+  if (up === 'WORKING') return 'working';
+  if (up === 'ONLINE') return 'online';
+  if (up === 'BUSY') return 'busy';
+  if (up === 'WAITING') return 'waiting';
+  if (up === 'OFFLINE') return 'offline';
+  if (up === 'ERROR') return 'error';
+  return 'unknown';
+}
+
 export async function fetchAgents(): Promise<Agent[]> {
   if (useMock) {
     await wait();
@@ -49,14 +61,7 @@ export async function fetchAgents(): Promise<Agent[]> {
       runtimeIds.add(canonicalId);
       const teamMatch = teamIdentity.find((a) => a.id === canonicalId);
 
-      const rawStatus = (rtAgent.availability || "").toUpperCase();
-      let status: AgentStatus = "unknown";
-      if (rawStatus === "WORKING") status = "working";
-      else if (rawStatus === "ONLINE") status = "online";
-      else if (rawStatus === "BUSY") status = "busy";
-      else if (rawStatus === "WAITING") status = "waiting";
-      else if (rawStatus === "OFFLINE") status = "offline";
-      else if (rawStatus === "ERROR") status = "error";
+      const status = mapAvailabilityToStatus(rtAgent.availability);
 
       if (teamMatch) {
         // Agent exists in team registry
