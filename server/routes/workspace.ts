@@ -11,16 +11,17 @@ import type { LastClawResponse } from '../runtime/types.js';
 
 export const workspaceRouter = express.Router();
 
-/** Canonical workspace roots — single shared workspace + per-agent sessions */
+/** Canonical workspace roots — uses OPENCLAW_HOME for shared workspace */
 function getWorkspaceRoots(): Record<string, string> {
+  const openclawHome = process.env.OPENCLAW_HOME || path.join(process.env.HOME || '~', '.openclaw');
   return {
-    'shared': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'main': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'draco': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'polaris': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'antares': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'altair': path.join(env.LASTCLAW_HOME, 'workspace'),
-    'capella': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'shared': path.join(openclawHome, 'workspace'),
+    'main': path.join(openclawHome, 'workspace'),
+    'draco': path.join(openclawHome, 'workspace'),
+    'polaris': path.join(openclawHome, 'workspace'),
+    'antares': path.join(openclawHome, 'workspace'),
+    'altair': path.join(openclawHome, 'workspace'),
+    'capella': path.join(openclawHome, 'workspace'),
   };
 }
 
