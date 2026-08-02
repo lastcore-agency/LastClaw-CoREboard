@@ -214,16 +214,18 @@ export class OpenClawAdapter {
     }
   }
 
-  /** Create a new session — placeholder (Gateway manages lifecycle) */
+  /** Create a new session — Gateway creates via chat.send (sessionKey routing) */
   async createSession(channel?: string, agentId?: string): Promise<LastClawResponse<any>> {
-    return ok({ channel, agentId, note: 'Use chat.send to start a conversation' });
+    // Gateway auto-creates sessions when chat.send is called with a new sessionKey
+    return ok({ channel, agentId, note: 'Gateway auto-creates sessions on chat.send' });
   }
 
   /** Send a message — via chat.send */
-  async sendMessage(sessionId: string, text: string): Promise<LastClawResponse<any>> {
+  async sendMessage(sessionKey: string, message: string): Promise<LastClawResponse<any>> {
     try {
       const client = getClient();
-      const result = await client.request('chat.send', { text, sessionId } as any);
+      const idempotencyKey = `lastclaw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const result = await client.request('chat.send', { sessionKey, message, idempotencyKey } as any);
       return ok(result);
     } catch (err) {
       const { code, message } = extractError(err);
@@ -231,16 +233,22 @@ export class OpenClawAdapter {
     }
   }
 
-  /** Close a session — no direct Gateway method */
+  /** Close a session — Gateway does not expose this method */
   async closeSession(sessionId: string): Promise<LastClawResponse<any>> {
-    return ok({ note: 'Session lifecycle managed by Gateway' });
+    return fail(null, 'NOT_SUPPORTED', 'Gateway does not expose a close session method');
   }
 
-  /** Send a chat message */
-  async sendChat(text: string, agentId?: string, sessionId?: string): Promise<LastClawResponse<any>> {
+  /** Send a chat message — Gateway chat.send */
+  async sendChat(message: string, sessionKey: string, agentId?: string): Promise<LastClawResponse<any>> {
     try {
       const client = getClient();
-      const result = await client.request('chat.send', { text, agentId, sessionId } as any);
+      const idempotencyKey = `lastclaw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const result = await client.request('chat.send', {
+        sessionKey,
+        message,
+        agentId,
+        idempotencyKey,
+      } as any);
       return ok(result);
     } catch (err) {
       const { code, message } = extractError(err);

@@ -35,14 +35,14 @@ runtimeRouter.post('/sessions', express.json(), async (req, res) => {
   res.json(result);
 });
 
-runtimeRouter.post('/sessions/:sessionId/send', express.json(), async (req, res) => {
-  const { sessionId } = req.params;
-  const { text } = req.body || {};
-  if (!text || typeof text !== 'string') {
-    res.status(400).json({ error: 'text is required' });
+runtimeRouter.post('/sessions/:sessionKey/send', express.json(), async (req, res) => {
+  const { sessionKey } = req.params;
+  const { message } = req.body || {};
+  if (!message || typeof message !== 'string') {
+    res.status(400).json({ error: 'message is required' });
     return;
   }
-  const result = await adapter.sendMessage(sessionId, text);
+  const result = await adapter.sendMessage(sessionKey, message);
   res.json(result);
 });
 
@@ -54,12 +54,16 @@ runtimeRouter.post('/sessions/:sessionId/close', async (req, res) => {
 
 // ── Chat ─────────────────────────────────────────────────────
 runtimeRouter.post('/chat', express.json(), async (req, res) => {
-  const { text, agentId, sessionId } = req.body || {};
-  if (!text || typeof text !== 'string') {
-    res.status(400).json({ error: 'text is required' });
+  const { message, sessionKey, agentId } = req.body || {};
+  if (!message || typeof message !== 'string') {
+    res.status(400).json({ error: 'message is required' });
     return;
   }
-  const result = await adapter.sendChat(text, agentId, sessionId);
+  if (!sessionKey || typeof sessionKey !== 'string') {
+    res.status(400).json({ error: 'sessionKey is required' });
+    return;
+  }
+  const result = await adapter.sendChat(message, sessionKey, agentId);
   res.json(result);
 });
 
