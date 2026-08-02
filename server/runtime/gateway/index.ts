@@ -1,6 +1,6 @@
 export { GatewayClient, type GatewayClientOptions } from './GatewayClient.js';
 export { GatewayEventBus, type NormalizedEvent } from './GatewayEvents.js';
-export { getOrCreateDeviceIdentity, signNonce, type DeviceIdentity } from './GatewayIdentity.js';
+export { getOrCreateDeviceIdentity, publicKeyRawBase64Url, signDevicePayload, type DeviceIdentity } from './GatewayIdentity.js';
 export {
   GATEWAY_PROTOCOL_VERSION,
   type GatewayFrame,

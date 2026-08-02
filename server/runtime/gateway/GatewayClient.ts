@@ -29,7 +29,7 @@ import {
   gatewayError,
 } from './GatewayErrors.js';
 import { GatewayEventBus, type NormalizedEvent } from './GatewayEvents.js';
-import { getOrCreateDeviceIdentity, signNonce, type DeviceIdentity } from './GatewayIdentity.js';
+import { getOrCreateDeviceIdentity, publicKeyRawBase64Url, signDevicePayload, type DeviceIdentity } from './GatewayIdentity.js';
 
 export interface GatewayClientOptions {
   url: string;
@@ -266,8 +266,19 @@ export class GatewayClient extends EventEmitter {
       return;
     }
 
-    const signature = signNonce(this.identity, payload.nonce);
     const now = Date.now();
+
+    const signature = signDevicePayload(this.identity, {
+      clientId: 'cli',
+      clientMode: 'backend',
+      role: 'operator',
+      scopes: ['operator.read', 'operator.write'],
+      signedAtMs: now,
+      token: this.opts.token,
+      nonce: payload.nonce,
+      platform: 'linux',
+      deviceFamily: undefined,
+    });
 
     const connectReq: GatewayRequest = {
       type: 'req',
@@ -292,7 +303,7 @@ export class GatewayClient extends EventEmitter {
         userAgent: 'lastclaw-coreboard/1.0.0',
         device: {
           id: this.identity.deviceId,
-          publicKey: this.identity.publicKey,
+          publicKey: publicKeyRawBase64Url(this.identity.publicKey),
           signature,
           signedAt: now,
           nonce: payload.nonce,
