@@ -37,7 +37,10 @@ export function getOrCreateDeviceIdentity(lastclawHome: string): DeviceIdentity 
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   });
 
-  const deviceId = `lastclaw-${crypto.randomBytes(8).toString('hex')}`;
+  // Derive device ID from public key fingerprint (SHA-256 of raw public key bytes)
+  const rawPubKey = crypto.createPublicKey(publicKey).export({ type: 'spki', format: 'der' });
+  const fingerprint = crypto.createHash('sha256').update(rawPubKey).digest('hex');
+  const deviceId = `device-${fingerprint.slice(0, 16)}`;
   const identity: DeviceIdentity = {
     deviceId,
     publicKey,
