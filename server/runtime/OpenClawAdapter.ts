@@ -256,16 +256,17 @@ export class OpenClawAdapter {
     }
   }
 
-  /** Get chat history for a session */
-  async chatHistory(sessionId: string, limit?: number): Promise<LastClawResponse<any[]>> {
+  /** Get chat history — via chat.history */
+  async chatHistory(sessionKey: string, limit?: number): Promise<LastClawResponse<any[]>> {
     try {
       const client = getClient();
-      const history = await client.request('chat.history', { sessionId, limit });
+      const history = await client.request('chat.history', { sessionKey, limit } as any);
       return ok(Array.isArray(history) ? history : []);
     } catch (err) {
       const { code, message } = extractError(err);
       return fail([], code, message);
     }
+  }
   }
 
   /** List workspace files — via worktrees.list */

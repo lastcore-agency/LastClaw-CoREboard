@@ -67,10 +67,10 @@ runtimeRouter.post('/chat', express.json(), async (req, res) => {
   res.json(result);
 });
 
-runtimeRouter.get('/chat/:sessionId/history', async (req, res) => {
-  const { sessionId } = req.params;
+runtimeRouter.get('/chat/:sessionKey/history', async (req, res) => {
+  const { sessionKey } = req.params;
   const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
-  const result = await adapter.chatHistory(sessionId, limit);
+  const result = await adapter.chatHistory(sessionKey, limit);
   res.json(result);
 });
 
