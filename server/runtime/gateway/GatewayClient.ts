@@ -267,6 +267,7 @@ export class GatewayClient extends EventEmitter {
     }
 
     const signature = signNonce(this.identity, payload.nonce);
+    const now = Date.now();
 
     const connectReq: GatewayRequest = {
       type: 'req',
@@ -275,12 +276,26 @@ export class GatewayClient extends EventEmitter {
       params: {
         minProtocol: GATEWAY_PROTOCOL_VERSION,
         maxProtocol: GATEWAY_PROTOCOL_VERSION,
-        auth: { kind: 'token', token: this.opts.token },
+        client: {
+          id: 'lastclaw-coreboard',
+          version: '1.0.0',
+          platform: 'linux',
+          mode: 'operator',
+        },
         role: 'operator',
         scopes: ['operator.read', 'operator.write'],
+        caps: [],
+        commands: [],
+        permissions: {},
+        auth: { token: this.opts.token },
+        locale: 'en-US',
+        userAgent: 'lastclaw-coreboard/1.0.0',
         device: {
-          nonce: payload.nonce,
+          id: this.identity.deviceId,
+          publicKey: this.identity.publicKey,
           signature,
+          signedAt: now,
+          nonce: payload.nonce,
         },
       },
     };
