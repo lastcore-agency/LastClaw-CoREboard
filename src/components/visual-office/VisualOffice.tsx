@@ -125,7 +125,10 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
     return isMobile ? agent.position.mobile : agent.position.desktop;
   }
 
-  // ── Drag & Drop (pointer events) ──
+  // ── Drag & Drop (pointer events with threshold) ──
+  const dragStartRef = useRef<{ x: number; y: number; agentId: string } | null>(null);
+  const DRAG_THRESHOLD = 5; // pixels before drag activates
+
   const handleAgentPointerDown = useCallback((e: React.PointerEvent, agentId: string) => {
     if (!editMode) return;
     e.preventDefault();
@@ -136,6 +139,8 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
     if (!agent) return;
     const pos = getAgentPos(agent);
     const agentPx = { x: (pos.x / 100) * rect.width, y: (pos.y / 100) * rect.height };
+    // Store drag start position — actual drag activates only after threshold
+    dragStartRef.current = { x: e.clientX, y: e.clientY, agentId };
     setDragging({ agentId, offsetX: e.clientX - rect.left - agentPx.x, offsetY: e.clientY - rect.top - agentPx.y });
     setDragPos({ x: e.clientX, y: e.clientY });
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -144,6 +149,15 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
   const handleAgentPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging || !containerRef.current) return;
     e.preventDefault();
+
+    // Check drag threshold before activating visual drag
+    if (dragStartRef.current) {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      dragStartRef.current = null; // threshold passed, now dragging
+    }
+
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left - dragging.offsetX) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top - dragging.offsetY) / rect.height) * 100;
@@ -153,6 +167,7 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
   const handleAgentPointerUp = useCallback((e: React.PointerEvent) => {
     if (!dragging || !containerRef.current) return;
     e.preventDefault();
+    dragStartRef.current = null;
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left - dragging.offsetX) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top - dragging.offsetY) / rect.height) * 100;
@@ -331,6 +346,8 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
                   agent.status === 'offline' ? 'agent-sprite--offline' : '',
                   agent.status === 'working' ? 'agent-sprite--working' : '',
                   agent.status === 'unknown' ? 'agent-sprite--unknown' : '',
+                  motionState === 'idle' || motionState === 'atDesk' ? 'agent-sprite--idle' : '',
+                  motionState === 'walking' ? 'agent-sprite--walking' : '',
                 ].filter(Boolean).join(' ')}
                 onClick={() => handleAgentClick(agent.id)}
                 onPointerDown={editMode ? (e) => handleAgentPointerDown(e, agent.id) : undefined}
