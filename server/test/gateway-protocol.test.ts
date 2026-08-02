@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocketServer } from 'ws';
-import { OpenClawAdapter } from '../../server/runtime/OpenClawAdapter.js';
+import { OpenClawAdapter, resetAdapterClient } from '../../server/runtime/OpenClawAdapter.js';
 
 describe('Gateway Protocol', () => {
   let wss: WebSocketServer;
@@ -8,14 +8,16 @@ describe('Gateway Protocol', () => {
   const PORT = 18795;
 
   beforeEach(() => {
+    resetAdapterClient();
     process.env.OPENCLAW_GATEWAY_URL = `ws://127.0.0.1:${PORT}`;
     process.env.LASTCLAW_HOME = '/tmp/lastclaw-test-' + Date.now();
     adapter = new OpenClawAdapter();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    resetAdapterClient();
     if (wss) {
-      wss.close();
+      await new Promise<void>((resolve) => wss.close(() => resolve()));
     }
   });
 
@@ -77,7 +79,7 @@ describe('Gateway Protocol', () => {
 
     const result = await adapter.getHealth();
     expect(result.source).toBe('ERROR');
-    expect(result.error?.code).toBe('GATEWAY_PROTOCOL_ERROR');
+    expect(result.error?.code).toBe('GATEWAY_REQUEST_FAILED');
   });
 
   it('handles gateway unavailable', async () => {

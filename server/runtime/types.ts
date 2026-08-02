@@ -21,8 +21,11 @@ export interface LastClawResponse<T> {
 export interface GatewayHealth {
   ok: boolean;
   ts: number;
-  durationMs: number;
-  status?: any;
+  durationMs?: number;
+  uptime?: number;
+  version?: string;
+  pid?: number;
+  memory?: { rss: number; heapUsed: number; heapTotal: number };
 }
 
 export interface RuntimeAgent {
@@ -34,7 +37,45 @@ export interface RuntimeAgent {
   name?: string;
   model?: string;
   workspace?: string;
-  bindings?: string[];
   availability?: string;
+  bindings?: string[];
+  role?: string;
+  status?: string;
   [key: string]: any;
+}
+
+export interface RuntimeSession {
+  id: string;
+  channel?: string;
+  channelType?: string;
+  agentId?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastMessage?: string;
+}
+
+export interface RuntimeChatMessage {
+  id?: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content?: string;
+  text?: string;
+  agentId?: string;
+  timestamp?: string;
+}
+
+export interface RuntimeWorkspaceFile {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
+  size?: number;
+  modified?: string;
+}
+
+export interface RuntimeLogEntry {
+  ts?: number;
+  level?: string;
+  msg?: string;
+  agentId?: string;
+  source?: string;
 }

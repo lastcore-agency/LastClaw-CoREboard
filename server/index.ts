@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { runtimeRouter } from './routes/runtime.js';
 import { eventStreamRouter } from './routes/events.js';
+import { shutdownAdapter } from './runtime/OpenClawAdapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,17 @@ if (isProd) {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+
+// Graceful shutdown — close GatewayClient WebSocket
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`\n[${signal}] Shutting down…`);
+  server.close();
+  await shutdownAdapter();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

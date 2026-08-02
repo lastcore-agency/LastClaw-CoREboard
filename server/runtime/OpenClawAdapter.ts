@@ -1,328 +1,378 @@
+/* ────────────────────────────────────────────────────────────
+   OpenClawAdapter — persistent GatewayClient wrapper
+   Replaces per-request WebSocket with a single persistent connection
+   ──────────────────────────────────────────────────────────── */
+
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-import { WebSocket } from 'ws';
-import crypto from 'crypto';
 import JSON5 from 'json5';
+import { GatewayClient, type GatewayClientOptions } from './gateway/GatewayClient.js';
+import type { GatewayError } from './gateway/GatewayErrors.js';
 import { env } from '../config/env.js';
-import { RuntimeAdapter } from './RuntimeAdapter.js';
-import { LastClawResponse, GatewayHealth, RuntimeAgent, DataSource } from './types.js';
-import { loadInstallationManifest, InstallationManifest } from '../config/manifest.js';
+import { loadInstallationManifest } from '../config/manifest.js';
+import type {
+  LastClawResponse,
+  GatewayHealth,
+  RuntimeAgent,
+  DataSource,
+} from './types.js';
 
-export class OpenClawAdapter implements RuntimeAdapter {
-  private cacheDir: string;
+let _client: GatewayClient | null = null;
 
-  constructor() {
-    this.cacheDir = path.join(env.LASTCLAW_HOME, 'cache');
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true });
-    }
+/** Reset the singleton client (for tests) */
+export function resetAdapterClient(): void {
+  if (_client) {
+    _client.close().catch(() => {});
+    _client = null;
   }
+}
 
-  private async writeCacheAtomically(key: string, data: any): Promise<void> {
-    const targetPath = path.join(this.cacheDir, `${key}.json`);
-    const tempPath = `${targetPath}.tmp.${Date.now()}`;
-    const payload = {
-      schemaVersion: 1,
-      observedAt: new Date().toISOString(),
-      data,
-    };
-    // Exclude tokens if any accidentally leaked
-    const safePayloadStr = JSON.stringify(payload, (k, v) => (k.toLowerCase().includes('token') ? undefined : v), 2);
-    await fs.promises.writeFile(tempPath, safePayloadStr, 'utf-8');
-    await fs.promises.rename(tempPath, targetPath);
+function getClient(): GatewayClient {
+  if (_client) return _client;
+
+  const opts: GatewayClientOptions = {
+    url: env.OPENCLAW_GATEWAY_URL,
+    token: env.OPENCLAW_GATEWAY_TOKEN,
+    lastclawHome: env.LASTCLAW_HOME,
+    reconnectDelay: 3000,
+    requestTimeout: 15_000,
+    maxReconnectAttempts: 0,
+  };
+
+  _client = new GatewayClient(opts);
+
+  _client.on('error', (err: GatewayError) => {
+    console.error(`[GatewayClient] error: ${err.code} — ${err.message}`);
+  });
+
+  _client.on('connected', (info: { serverVersion?: string; protocol?: number }) => {
+    console.log(`[GatewayClient] connected to Gateway v${info.serverVersion}, protocol ${info.protocol}`);
+  });
+
+  _client.on('disconnected', (err: GatewayError) => {
+    console.warn(`[GatewayClient] disconnected: ${err.code} — ${err.message}`);
+  });
+
+  _client.on('gave-up', (err: GatewayError) => {
+    console.error(`[GatewayClient] gave up reconnecting: ${err.message}`);
+  });
+
+  return _client;
+}
+
+/** Shut down the client (for graceful shutdown) */
+export function shutdownAdapter(): Promise<void> {
+  if (_client) {
+    const p = _client.close();
+    _client = null;
+    return p;
   }
+  return Promise.resolve();
+}
 
-  private async readCache(key: string): Promise<any | null> {
-    const targetPath = path.join(this.cacheDir, `${key}.json`);
-    try {
-      const content = await fs.promises.readFile(targetPath, 'utf-8');
-      return JSON.parse(content);
-    } catch {
-      return null;
-    }
+/** Get the shared GatewayClient instance */
+export function getGatewayClient(): GatewayClient {
+  return getClient();
+}
+
+function ok<T>(data: T, source: DataSource = 'LIVE'): LastClawResponse<T> {
+  return { data, source, observedAt: new Date().toISOString(), stale: false };
+}
+
+function fail<T>(data: T, code: string, message: string): LastClawResponse<T> {
+  return {
+    data,
+    source: 'ERROR',
+    observedAt: new Date().toISOString(),
+    stale: false,
+    error: { code, message },
+  };
+}
+
+function extractError(err: unknown): { code: string; message: string } {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    const e = err as { code: string; message?: string };
+    return { code: e.code, message: e.message || String(e) };
   }
+  return {
+    code: 'GATEWAY_UNAVAILABLE',
+    message: err instanceof Error ? err.message : String(err),
+  };
+}
 
-  private mapToCanonicalAgents(rawAgents: any[], defaultModel?: string, defaultWorkspace?: string): RuntimeAgent[] {
+export class OpenClawAdapter {
+  // ── Canonical agent mapping (manifest-aware) ────────────────
+  mapToCanonicalAgents(rawAgents: any[]): RuntimeAgent[] {
     const manifest = loadInstallationManifest();
-    return rawAgents.map(a => {
-      const runtimeAgentId = a.id;
-      let canonicalId = runtimeAgentId;
+    const runtimeTarget = manifest.runtimeTarget || 'unknown';
 
-      for (const [canonId, def] of Object.entries(manifest.agents)) {
-        if (def.runtimeAgentId === runtimeAgentId || (def.runtimeAliases && def.runtimeAliases.includes(runtimeAgentId))) {
-          canonicalId = canonId;
-          break;
+    // Build reverse map: runtimeAgentId → canonical agent id
+    const reverseMap = new Map<string, string>();
+    for (const [canonicalId, agent] of Object.entries(manifest.agents)) {
+      reverseMap.set(agent.runtimeAgentId, canonicalId);
+      if (agent.runtimeAliases) {
+        for (const alias of agent.runtimeAliases) {
+          reverseMap.set(alias, canonicalId);
         }
       }
+    }
 
-      let availability = 'UNKNOWN';
-      const rawAvailability = (a.availability || '').toUpperCase();
-      if (['WORKING', 'ONLINE', 'BUSY', 'WAITING', 'OFFLINE', 'ERROR'].includes(rawAvailability)) {
-        availability = rawAvailability;
-      }
+    const VALID_AVAILABILITIES = new Set([
+      'ONLINE', 'WORKING', 'BUSY', 'WAITING', 'OFFLINE', 'ERROR', 'UNKNOWN',
+    ]);
 
-      const ws = a.workspace || defaultWorkspace;
+    return rawAgents.map((raw: any) => {
+      const runtimeAgentId = raw.id || '';
+      const canonicalId = reverseMap.get(runtimeAgentId) || runtimeAgentId;
+      const manifestAgent = manifest.agents[canonicalId];
+      const rawAvail = (raw.availability || 'UNKNOWN').toUpperCase();
+      const availability = VALID_AVAILABILITIES.has(rawAvail) ? rawAvail : 'UNKNOWN';
+
+      // Expand ~ to home directory
+      const expandHome = (p: string) =>
+        p.replace(/^~(?=$|\/)/, process.env.HOME || '~');
 
       return {
         id: canonicalId,
         canonicalId,
         runtimeAgentId,
-        runtimeTarget: manifest.runtimeTarget,
-        runtimeKey: `${manifest.runtimeTarget}:${runtimeAgentId}`,
-        name: a.name,
-        model: a.model || defaultModel || 'unknown',
-        workspace: ws ? ws.replace(/^~(?=$|\/|\\)/, os.homedir()) : ws,
-        bindings: a.bindings || [],
-        availability
+        runtimeTarget,
+        runtimeKey: `${runtimeTarget}:${runtimeAgentId}`,
+        name: raw.name || canonicalId,
+        model: raw.model || 'unknown',
+        workspace: raw.workspace
+          ? expandHome(raw.workspace)
+          : manifestAgent?.workspace || '',
+        availability,
+        bindings: raw.bindings || [],
+        role: raw.role || 'agent',
       };
     });
   }
 
-  private async readFallbackConfig(): Promise<{ source: DataSource; error?: any; agents?: RuntimeAgent[]; workspaces?: string[] }> {
-    try {
-      const content = await fs.promises.readFile(env.OPENCLAW_CONFIG_PATH, 'utf-8');
-      const parsed = JSON5.parse(content);
-      
-      const agents = parsed?.agents?.list || [];
-      const mappedAgents: RuntimeAgent[] = this.mapToCanonicalAgents(agents, parsed?.agents?.defaults?.model, parsed?.agents?.defaults?.workspace);
-
-      const workspaces = mappedAgents.map(a => a.workspace).filter(Boolean) as string[];
-
-      return {
-        source: 'FALLBACK',
-        agents: mappedAgents,
-        workspaces: Array.from(new Set(workspaces))
-      };
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
-        return { source: 'ERROR', error: { code: 'CONFIG_NOT_FOUND', message: 'Config file not found' } };
-      }
-      return { source: 'ERROR', error: { code: 'CONFIG_PARSE_FAILED', message: 'Failed to parse config file' } };
-    }
-  }
-
-  private async executeGatewayCommand<T>(method: string, params: any = {}): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(env.OPENCLAW_GATEWAY_URL);
-      
-      let challengeReceived = false;
-      let helloOkReceived = false;
-      const timeoutId = setTimeout(() => {
-        ws.close();
-        reject({ code: 'GATEWAY_TIMEOUT', message: 'Gateway connection timed out' });
-      }, 5000);
-
-      ws.on('error', (err: any) => {
-        clearTimeout(timeoutId);
-        reject({ code: 'GATEWAY_UNAVAILABLE', message: err.message });
-      });
-
-      ws.on('message', (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          
-          if (msg.type === 'event' && msg.event === 'connect.challenge') {
-            challengeReceived = true;
-            const nonce = msg.payload.nonce;
-            const ts = Date.now();
-            
-            // Dummy keypair for device signature matching protocol format
-            const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-            const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
-            // The server derives deviceId from PEM by removing header/footer and hashing
-            // But we can just use the server's derive logic or send PEM.
-            // Wait, deriveDeviceIdFromPublicKey on server handles PEM strings too.
-            // Let's just hash the SPKI DER directly for deviceId because derivePublicKeyRaw extracts the DER from PEM.
-            const derBuffer = publicKey.export({ type: 'spki', format: 'der' });
-            const deviceId = crypto.createHash('sha256').update(derBuffer.subarray(12)).digest('hex');
-
-            const payloadV2 = [
-              'v2',
-              deviceId,
-              'cli',
-              'cli',
-              'operator',
-              'operator.read',
-              String(ts),
-              env.OPENCLAW_GATEWAY_TOKEN,
-              nonce
-            ].join('|');
-
-            const signature = crypto.sign(null, Buffer.from(payloadV2, 'utf8'), privateKey).toString('base64');
-
-            ws.send(JSON.stringify({
-              type: 'req',
-              id: 'req_connect',
-              method: 'connect',
-              params: {
-                minProtocol: 1,
-                maxProtocol: 10,
-                client: { id: 'cli', version: '1.0.0', platform: os.platform(), mode: 'cli' },
-                role: 'operator',
-                scopes: ['operator.read'],
-                caps: [],
-                commands: [],
-                permissions: {},
-                auth: { token: env.OPENCLAW_GATEWAY_TOKEN },
-                locale: 'en-US',
-                userAgent: 'lastclaw-server/1.0.0',
-                device: {
-                  id: deviceId,
-                  publicKey: publicKeyPem,
-                  signature,
-                  signedAt: ts,
-                  nonce
-                }
-              }
-            }));
-          } else if (msg.type === 'res' && msg.id === 'req_connect') {
-            if (msg.ok && msg.payload && msg.payload.type === 'hello-ok') {
-              helloOkReceived = true;
-              
-              if (method === 'health') {
-                 // The hello-ok might contain status, or we might need to send a health request.
-                 // The prompt specifies to establish handshake, then return health/state.
-                 ws.send(JSON.stringify({ type: 'req', id: 'req_target', method: 'health', params }));
-              } else {
-                 ws.send(JSON.stringify({ type: 'req', id: 'req_target', method, params }));
-              }
-            } else {
-              clearTimeout(timeoutId);
-              ws.close();
-              reject({ code: 'GATEWAY_AUTH_FAILED', message: msg.error?.message || 'Handshake failed' });
-            }
-          } else if (msg.type === 'res' && msg.id === 'req_target') {
-            clearTimeout(timeoutId);
-            ws.close();
-            if (msg.ok) {
-              resolve(msg.payload);
-            } else {
-              reject({ code: 'GATEWAY_PROTOCOL_ERROR', message: msg.error?.message || 'Request failed' });
-            }
-          }
-        } catch (err: any) {
-          console.error('WS MESSAGE ERROR:', err.stack);
-          clearTimeout(timeoutId);
-          ws.close();
-          reject({ code: 'GATEWAY_PROTOCOL_ERROR', message: 'Malformed JSON from gateway' });
-        }
-      });
-    });
-  }
-
-  async discoverRuntime(): Promise<void> {
-    // No-op for now
-  }
-
+  /** Health check via persistent connection with cache fallback */
   async getHealth(): Promise<LastClawResponse<GatewayHealth | null>> {
-    const observedAt = new Date().toISOString();
     try {
-      const startTime = Date.now();
-      const payload = await this.executeGatewayCommand<any>('health');
-      const durationMs = Date.now() - startTime;
-      
-      const health: GatewayHealth = {
-        ok: payload?.ok ?? true,
-        ts: payload?.ts ?? Date.now(),
-        durationMs,
-        status: payload?.status
-      };
-      
-      await this.writeCacheAtomically('health', health);
-
-      return {
-        data: health,
-        source: 'LIVE',
-        observedAt,
-        stale: false,
-      };
-    } catch (err: any) {
-      console.error('getHealth error:', err);
+      const client = getClient();
+      const payload = await client.request('health');
+      const response = ok(payload as GatewayHealth);
+      // Write cache on success
+      await this.writeCacheAtomically('health', payload).catch(() => {});
+      return response;
+    } catch (err) {
+      const { code, message } = extractError(err);
+      // Try cache fallback
       const cached = await this.readCache('health');
-      if (cached) {
-        return {
-          data: cached.data,
-          source: 'CACHED',
-          observedAt: cached.observedAt,
-          stale: true,
-          error: { code: err.code, message: err.message }
-        };
+      if (cached.source === 'CACHED') {
+        return cached;
       }
-
-      return {
-        data: null,
-        source: 'ERROR',
-        observedAt,
-        stale: false,
-        error: { code: err.code || 'UNKNOWN', message: err.message || 'Failed to get health' }
-      };
+      return fail(null, code, message);
     }
   }
 
+  /** List agents via persistent connection */
   async listAgents(): Promise<LastClawResponse<RuntimeAgent[]>> {
-    const observedAt = new Date().toISOString();
     try {
-      const payload = await this.executeGatewayCommand<any>('agents.list');
-      let agents: RuntimeAgent[] = [];
-      if (Array.isArray(payload)) {
-        agents = this.mapToCanonicalAgents(payload);
-      } else if (payload && payload.agents) {
-        agents = this.mapToCanonicalAgents(payload.agents);
-      }
-      
-      if (agents.length === 0) {
-        return { data: [], source: 'EMPTY', observedAt, stale: false };
-      }
-
-      await this.writeCacheAtomically('agents', agents);
-      
-      return {
-        data: agents,
-        source: 'LIVE',
-        observedAt,
-        stale: false,
-      };
-    } catch (err: any) {
-      // Fallback logic
-      const fallback = await this.readFallbackConfig();
-      if (fallback.source === 'FALLBACK') {
-        return {
-          data: fallback.agents || [],
-          source: 'FALLBACK',
-          observedAt,
-          stale: false,
-          error: { code: err.code, message: err.message }
-        };
-      }
-
-      const cached = await this.readCache('agents');
-      if (cached) {
-        return {
-          data: cached.data,
-          source: 'CACHED',
-          observedAt: cached.observedAt,
-          stale: true,
-          error: { code: err.code, message: err.message }
-        };
-      }
-
-      return {
-        data: [],
-        source: fallback.source,
-        observedAt,
-        stale: false,
-        error: fallback.error || { code: err.code, message: err.message }
-      };
+      const client = getClient();
+      const agents = await client.request('agents.list');
+      const list = Array.isArray(agents) ? agents : [];
+      return ok(this.mapToCanonicalAgents(list));
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail([], code, message);
     }
   }
 
-  async listWorkspaces(): Promise<LastClawResponse<string[]>> {
-    const agentsRes = await this.listAgents();
-    const workspaces = Array.from(new Set(agentsRes.data.map(a => a.workspace).filter(Boolean) as string[]));
-    return {
-      ...agentsRes,
-      data: workspaces,
-    };
+  /** List workspaces — resolved from agents */
+  async listWorkspaces(): Promise<LastClawResponse<Record<string, string>>> {
+    const result = await this.listAgents();
+    if (result.source === 'ERROR') {
+      return fail({}, result.error!.code, result.error!.message);
+    }
+    const workspaces: Record<string, string> = {};
+    for (const agent of result.data || []) {
+      if (agent.workspace) {
+        workspaces[agent.id] = agent.workspace;
+      }
+    }
+    return ok(workspaces, result.source);
   }
+
+  /** List sessions */
+  async listSessions(agentId?: string): Promise<LastClawResponse<any[]>> {
+    try {
+      const client = getClient();
+      const sessions = await client.request('sessions.list', agentId ? { agentId } : undefined);
+      return ok(Array.isArray(sessions) ? sessions : []);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail([], code, message);
+    }
+  }
+
+  /** Create a new session */
+  async createSession(channel?: string, agentId?: string): Promise<LastClawResponse<any>> {
+    try {
+      const client = getClient();
+      const session = await client.request('sessions.create', { channel, agentId } as any);
+      return ok(session);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail(null, code, message);
+    }
+  }
+
+  /** Send a message to a session */
+  async sendMessage(sessionId: string, text: string): Promise<LastClawResponse<any>> {
+    try {
+      const client = getClient();
+      const result = await client.request('sessions.send', { sessionId, text });
+      return ok(result);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail(null, code, message);
+    }
+  }
+
+  /** Close a session */
+  async closeSession(sessionId: string): Promise<LastClawResponse<any>> {
+    try {
+      const client = getClient();
+      const result = await client.request('sessions.close', { sessionId });
+      return ok(result);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail(null, code, message);
+    }
+  }
+
+  /** Send a chat message */
+  async sendChat(text: string, agentId?: string, sessionId?: string): Promise<LastClawResponse<any>> {
+    try {
+      const client = getClient();
+      const result = await client.request('chat.send', { text, agentId, sessionId } as any);
+      return ok(result);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail(null, code, message);
+    }
+  }
+
+  /** Get chat history for a session */
+  async chatHistory(sessionId: string, limit?: number): Promise<LastClawResponse<any[]>> {
+    try {
+      const client = getClient();
+      const history = await client.request('chat.history', { sessionId, limit });
+      return ok(Array.isArray(history) ? history : []);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail([], code, message);
+    }
+  }
+
+  /** List workspace files */
+  async listFiles(workspace: string, filePath?: string): Promise<LastClawResponse<any[]>> {
+    try {
+      const client = getClient();
+      const files = await client.request('files.list', { workspace, path: filePath });
+      return ok(Array.isArray(files) ? files : []);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail([], code, message);
+    }
+  }
+
+  /** Read a workspace file */
+  async readFile(workspace: string, filePath: string): Promise<LastClawResponse<any>> {
+    try {
+      const client = getClient();
+      const file = await client.request('files.read', { workspace, path: filePath });
+      return ok(file);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail(null, code, message);
+    }
+  }
+
+  /** Get logs */
+  async getLogs(agentId?: string, limit?: number, level?: string): Promise<LastClawResponse<any[]>> {
+    try {
+      const client = getClient();
+      const logs = await client.request('logs', { agentId, limit, level } as any);
+      return ok(Array.isArray(logs) ? logs : []);
+    } catch (err) {
+      const { code, message } = extractError(err);
+      return fail([], code, message);
+    }
+  }
+
+  // ── Fallback config reader ──────────────────────────────────
+  async readFallbackConfig(): Promise<any> {
+    const configPath = env.OPENCLAW_CONFIG_PATH;
+    try {
+      if (!fs.existsSync(configPath)) {
+        return { source: 'ERROR', error: { code: 'CONFIG_NOT_FOUND', message: `Config not found: ${configPath}` } };
+      }
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON5.parse(raw);
+      const defaults = parsed?.agents?.defaults || {};
+      const agents = (parsed?.agents?.list || []).map((a: any) => ({
+        ...a,
+        workspace: a.workspace || defaults.workspace || '',
+        model: a.model || defaults.model || 'unknown',
+      }));
+      return { source: 'FALLBACK', agents, defaults };
+    } catch (err) {
+      return { source: 'ERROR', error: { code: 'CONFIG_PARSE_FAILED', message: err instanceof Error ? err.message : String(err) } };
+    }
+  }
+
+  // ── Cache read/write (with redaction) ──────────────────────
+  async readCache(name: string): Promise<LastClawResponse<any>> {
+    const cacheDir = path.join(env.LASTCLAW_HOME, 'cache');
+    const cachePath = path.join(cacheDir, `${name}.json`);
+    try {
+      if (!fs.existsSync(cachePath)) {
+        return fail(null, 'CACHE_NOT_FOUND', 'No cache file');
+      }
+      const raw = fs.readFileSync(cachePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      const age = Date.now() - new Date(parsed.observedAt).getTime();
+      const stale = age > 300_000; // 5 minutes
+      return { data: parsed.data, source: 'CACHED', observedAt: parsed.observedAt, stale };
+    } catch {
+      return fail(null, 'CACHE_CORRUPTED', 'Cache file corrupted');
+    }
+  }
+
+  async writeCacheAtomically(name: string, data: any): Promise<void> {
+    const cacheDir = path.join(env.LASTCLAW_HOME, 'cache');
+    fs.mkdirSync(cacheDir, { recursive: true });
+
+    const redacted = redactSensitiveFields(structuredClone(data));
+    const payload = {
+      schemaVersion: 1,
+      observedAt: new Date().toISOString(),
+      data: redacted,
+    };
+
+    const tmpPath = path.join(cacheDir, `${name}.tmp`);
+    const finalPath = path.join(cacheDir, `${name}.json`);
+    fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2));
+    fs.renameSync(tmpPath, finalPath);
+  }
+}
+
+/** Recursively redact fields that look like tokens/keys/secrets */
+function redactSensitiveFields(obj: any): any {
+  if (typeof obj !== 'object' || obj === null) return obj;
+  const SENSITIVE = /token|key|secret|password|authorization|credential/i;
+  for (const k of Object.keys(obj)) {
+    if (SENSITIVE.test(k) && typeof obj[k] === 'string') {
+      delete obj[k];
+    } else if (typeof obj[k] === 'object' && obj[k] !== null) {
+      redactSensitiveFields(obj[k]);
+    }
+  }
+  return obj;
 }
