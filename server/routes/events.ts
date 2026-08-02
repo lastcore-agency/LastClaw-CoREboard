@@ -136,17 +136,19 @@ eventStreamRouter.get('/events', (req, res) => {
   });
 });
 
-// ── Manual event injection (testing only) ────────────────────
-eventStreamRouter.post('/events/inject', express.json(), (req, res) => {
-  const event: NormalizedEvent = {
-    id: `evt-inject-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    timestamp: new Date().toISOString(),
-    type: req.body.type || 'message.started',
-    agentId: req.body.agentId || 'sirius',
-    targetAgentId: req.body.targetAgentId,
-    text: req.body.text || 'Hello from injected event',
-    source: 'LIVE',
-  };
-  broadcastToClients(event);
-  res.json({ ok: true, event });
-});
+// ── Manual event injection (TESTING ONLY, disabled in production) ────
+if (process.env.NODE_ENV !== 'production') {
+  eventStreamRouter.post('/events/inject', express.json(), (req, res) => {
+    const event: NormalizedEvent = {
+      id: `evt-inject-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      type: req.body.type || 'message.started',
+      agentId: req.body.agentId || 'sirius',
+      targetAgentId: req.body.targetAgentId,
+      text: req.body.text || 'Hello from injected event',
+      source: 'LIVE',
+    };
+    broadcastToClients(event);
+    res.json({ ok: true, event });
+  });
+}
