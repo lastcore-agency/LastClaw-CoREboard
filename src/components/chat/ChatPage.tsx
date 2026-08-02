@@ -115,19 +115,22 @@ export function ChatPage() {
   const loadHistory = useCallback(async (sessionKey: string) => {
     if (!sessionKey) return;
     try {
-      const res = await fetch(`${API}/chat/${encodeURIComponent(sessionKey)}/history?limit=50`);
+      const res = await fetch(`${API}/transcript/${encodeURIComponent(sessionKey)}?limit=50`);
       const json = await res.json();
       const msgs: TimelineItem[] = (json.data || []).map((m: any, i: number) => ({
         id: `hist-${i}-${m.role || 'unknown'}`,
         type: m.role === 'user' ? 'user-message' : 'agent-response',
         role: m.role || 'system',
-        text: contentToText(m.content) || contentToText(m.text) || m.text || '',
-        agentId: m.agentId,
+        text: m.text || '',
+        agentId: m.model,
         timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
         source: 'REAL',
       }));
       setMessages(msgs.filter(m => m.text.trim()));
-    } catch { /* history may be empty — not an error */ }
+      setHealthSource(json.source || 'UNKNOWN');
+    } catch {
+      setHealthSource('UNREACHABLE');
+    }
   }, []);
 
   useEffect(() => {
