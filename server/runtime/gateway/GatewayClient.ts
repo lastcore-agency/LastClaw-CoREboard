@@ -280,7 +280,7 @@ export class GatewayClient extends EventEmitter {
           id: 'cli',
           version: '1.0.0',
           platform: 'linux',
-          mode: 'operator',
+          mode: 'backend',
         },
         role: 'operator',
         scopes: ['operator.read', 'operator.write'],
