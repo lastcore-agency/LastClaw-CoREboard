@@ -10,6 +10,9 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
 import { useAgentEvents } from './lib/useAgentEvents';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { ChatPage } from './components/chat/ChatPage';
+import { StudioPage } from './components/studio/StudioPage';
+import { DiagnosticsPage } from './components/diagnostics/DiagnosticsPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
 
@@ -135,13 +138,16 @@ export default function App() {
         )}
 
         {activePage === 'settings' && <SettingsPage key="settings" />}
+        {activePage === 'chat' && <ChatPage key="chat" />}
+        {activePage === 'studio' && <StudioPage key="studio" />}
+        {activePage === 'board' && <DiagnosticsPage key="diagnostics" />}
 
-        {['studio', 'board', 'chat'].includes(activePage) && (
+        {false && ['placeholder'].includes(activePage) && (
           <motion.div key={activePage} variants={pageVariants} initial="initial" animate="animate" exit="exit" className="placeholder-page">
             <div className="placeholder-card premium-card">
               <div className="premium-border-trail" aria-hidden="true" />
               <div className="placeholder-page__icon">
-                {activePage === 'studio' && '⟨/⟩'}
+                {activePage === 'studio' && '<>'}
                 {activePage === 'board' && '📋'}
                 {activePage === 'chat' && '💬'}
               </div>
