@@ -11,15 +11,16 @@ import type { LastClawResponse } from '../runtime/types.js';
 
 export const workspaceRouter = express.Router();
 
-/** Canonical workspace roots from env/config */
+/** Canonical workspace roots — single shared workspace + per-agent sessions */
 function getWorkspaceRoots(): Record<string, string> {
   return {
-    'main': path.join(env.LASTCLAW_HOME, 'agents', 'main'),
-    'draco': path.join(env.LASTCLAW_HOME, 'agents', 'draco'),
-    'polaris': path.join(env.LASTCLAW_HOME, 'agents', 'polaris'),
-    'antares': path.join(env.LASTCLAW_HOME, 'agents', 'antares'),
-    'altair': path.join(env.LASTCLAW_HOME, 'agents', 'altair'),
-    'capella': path.join(env.LASTCLAW_HOME, 'agents', 'capella'),
+    'shared': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'main': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'draco': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'polaris': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'antares': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'altair': path.join(env.LASTCLAW_HOME, 'workspace'),
+    'capella': path.join(env.LASTCLAW_HOME, 'workspace'),
   };
 }
 

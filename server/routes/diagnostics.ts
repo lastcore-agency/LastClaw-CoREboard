@@ -106,9 +106,9 @@ diagnosticsRouter.get('/diagnostics/logs', (req, res) => {
 });
 
 // ── Connection diagnostics ──────────────────────────────────
-diagnosticsRouter.get('/diagnostics/connection', (_req, res) => {
-  const { getGatewayClient } = require('../runtime/OpenClawAdapter.js');
+diagnosticsRouter.get('/diagnostics/connection', async (_req, res) => {
   try {
+    const { getGatewayClient } = await import('../runtime/OpenClawAdapter.js');
     const client = getGatewayClient();
     res.json({
       data: {
