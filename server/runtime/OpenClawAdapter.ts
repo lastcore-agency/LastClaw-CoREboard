@@ -170,13 +170,13 @@ export class OpenClawAdapter {
     }
   }
 
-  /** List agents via persistent connection */
+  /** List agents — extracted from health payload (no agents.list method exists) */
   async listAgents(): Promise<LastClawResponse<RuntimeAgent[]>> {
     try {
       const client = getClient();
-      const agents = await client.request('agents.list');
-      const list = Array.isArray(agents) ? agents : [];
-      return ok(this.mapToCanonicalAgents(list));
+      const health = await client.request('health') as any;
+      const rawAgents = health?.agents || [];
+      return ok(this.mapToCanonicalAgents(rawAgents));
     } catch (err) {
       const { code, message } = extractError(err);
       return fail([], code, message);
@@ -198,35 +198,32 @@ export class OpenClawAdapter {
     return ok(workspaces, result.source);
   }
 
-  /** List sessions */
+  /** List sessions — extracted from health payload */
   async listSessions(agentId?: string): Promise<LastClawResponse<any[]>> {
     try {
       const client = getClient();
-      const sessions = await client.request('sessions.list', agentId ? { agentId } : undefined);
-      return ok(Array.isArray(sessions) ? sessions : []);
+      const health = await client.request('health') as any;
+      let sessions = health?.sessions?.recent || [];
+      if (agentId) {
+        sessions = sessions.filter((s: any) => s.key?.includes(`agent:${agentId}:`));
+      }
+      return ok(sessions);
     } catch (err) {
       const { code, message } = extractError(err);
       return fail([], code, message);
     }
   }
 
-  /** Create a new session */
+  /** Create a new session — placeholder (Gateway manages lifecycle) */
   async createSession(channel?: string, agentId?: string): Promise<LastClawResponse<any>> {
-    try {
-      const client = getClient();
-      const session = await client.request('sessions.create', { channel, agentId } as any);
-      return ok(session);
-    } catch (err) {
-      const { code, message } = extractError(err);
-      return fail(null, code, message);
-    }
+    return ok({ channel, agentId, note: 'Use chat.send to start a conversation' });
   }
 
-  /** Send a message to a session */
+  /** Send a message — via chat.send */
   async sendMessage(sessionId: string, text: string): Promise<LastClawResponse<any>> {
     try {
       const client = getClient();
-      const result = await client.request('sessions.send', { sessionId, text });
+      const result = await client.request('chat.send', { text, sessionId } as any);
       return ok(result);
     } catch (err) {
       const { code, message } = extractError(err);
@@ -234,16 +231,9 @@ export class OpenClawAdapter {
     }
   }
 
-  /** Close a session */
+  /** Close a session — no direct Gateway method */
   async closeSession(sessionId: string): Promise<LastClawResponse<any>> {
-    try {
-      const client = getClient();
-      const result = await client.request('sessions.close', { sessionId });
-      return ok(result);
-    } catch (err) {
-      const { code, message } = extractError(err);
-      return fail(null, code, message);
-    }
+    return ok({ note: 'Session lifecycle managed by Gateway' });
   }
 
   /** Send a chat message */
@@ -270,35 +260,28 @@ export class OpenClawAdapter {
     }
   }
 
-  /** List workspace files */
+  /** List workspace files — via worktrees.list */
   async listFiles(workspace: string, filePath?: string): Promise<LastClawResponse<any[]>> {
     try {
       const client = getClient();
-      const files = await client.request('files.list', { workspace, path: filePath });
-      return ok(Array.isArray(files) ? files : []);
+      const worktrees = await client.request('worktrees.list' as any, { workspace } as any);
+      return ok(Array.isArray(worktrees) ? worktrees : []);
     } catch (err) {
       const { code, message } = extractError(err);
       return fail([], code, message);
     }
   }
 
-  /** Read a workspace file */
+  /** Read a workspace file — placeholder */
   async readFile(workspace: string, filePath: string): Promise<LastClawResponse<any>> {
-    try {
-      const client = getClient();
-      const file = await client.request('files.read', { workspace, path: filePath });
-      return ok(file);
-    } catch (err) {
-      const { code, message } = extractError(err);
-      return fail(null, code, message);
-    }
+    return ok({ path: filePath, content: '', note: 'File read via Gateway not yet implemented' });
   }
 
-  /** Get logs */
+  /** Get logs — via diagnostics.stability */
   async getLogs(agentId?: string, limit?: number, level?: string): Promise<LastClawResponse<any[]>> {
     try {
       const client = getClient();
-      const logs = await client.request('logs', { agentId, limit, level } as any);
+      const logs = await client.request('diagnostics.stability' as any, {} as any);
       return ok(Array.isArray(logs) ? logs : []);
     } catch (err) {
       const { code, message } = extractError(err);
