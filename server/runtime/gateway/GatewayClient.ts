@@ -277,7 +277,7 @@ export class GatewayClient extends EventEmitter {
         minProtocol: GATEWAY_PROTOCOL_VERSION,
         maxProtocol: GATEWAY_PROTOCOL_VERSION,
         client: {
-          id: 'lastclaw-coreboard',
+          id: 'cli',
           version: '1.0.0',
           platform: 'linux',
           mode: 'operator',
