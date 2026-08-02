@@ -37,10 +37,16 @@ export function getOrCreateDeviceIdentity(lastclawHome: string): DeviceIdentity 
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   });
 
-  // Derive device ID from public key fingerprint (SHA-256 of raw public key bytes)
-  const rawPubKey = crypto.createPublicKey(publicKey).export({ type: 'spki', format: 'der' });
-  const fingerprint = crypto.createHash('sha256').update(rawPubKey).digest('hex');
-  const deviceId = `device-${fingerprint.slice(0, 16)}`;
+  // Derive device ID from public key fingerprint (SHA-256 of raw Ed25519 key bytes)
+  // OpenClaw strips the 12-byte SPKI prefix before hashing
+  const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+  const spki = crypto.createPublicKey(publicKey).export({ type: 'spki', format: 'der' });
+  const rawKey = spki.length === ED25519_SPKI_PREFIX.length + 32
+    && spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)
+    ? spki.subarray(ED25519_SPKI_PREFIX.length)
+    : spki;
+  const fingerprint = crypto.createHash('sha256').update(rawKey).digest('hex');
+  const deviceId = fingerprint;
   const identity: DeviceIdentity = {
     deviceId,
     publicKey,
