@@ -2,7 +2,7 @@
    OpenClaw Gateway Protocol v3 — typed frames
    ──────────────────────────────────────────────────────────── */
 
-export const GATEWAY_PROTOCOL_VERSION = 3 as const;
+export const GATEWAY_PROTOCOL_VERSION = 4 as const;
 
 // ── Request ──────────────────────────────────────────────────
 export interface GatewayRequest {
