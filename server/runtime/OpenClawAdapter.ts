@@ -267,7 +267,6 @@ export class OpenClawAdapter {
       return fail([], code, message);
     }
   }
-  }
 
   /** List workspace files — via worktrees.list */
   async listFiles(workspace: string, filePath?: string): Promise<LastClawResponse<any[]>> {
