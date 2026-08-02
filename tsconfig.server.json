@@ -16,6 +16,8 @@
     "server/test/motion.test.ts",
     "server/test/layout.test.ts",
     "server/test/events.test.ts",
-    "server/test/unknown-status.test.ts"
+    "server/test/unknown-status.test.ts",
+    "server/test/session-types.test.ts",
+    "server/test/session-storage.test.ts"
   ]
 }

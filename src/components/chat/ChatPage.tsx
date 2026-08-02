@@ -1,100 +1,923 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+/* ────────────────────────────────────────────────────────────
+   ChatPage — LastClaw Native Session Workroom
+   Three-column command-center session interface
+   ──────────────────────────────────────────────────────────── */
 
-interface Session { key: string; updatedAt: number; }
-interface ChatMessage { role: string; text: string; }
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import './chat.css';
+import {
+  type NativeSession,
+  type TimelineItem,
+  type NormalizedEvent,
+  type RuntimeAgent,
+  type LastClawResponse,
+  type SessionSource,
+  type SessionMetadata,
+  type WorkspaceFile,
+  type WorkspaceFileContent,
+  CANONICAL_AGENTS,
+  classifySessionSource,
+  classifySessionGroup,
+  deriveSessionTitle,
+  getAgentName,
+  getCanonicalAgentId,
+  getRuntimeAgentId,
+  formatRelativeTime,
+  formatTime,
+  getSourceBadge,
+  getTimelineTypeDisplay,
+} from './session-types';
+import {
+  loadSessionData,
+  saveSessionData,
+  saveSessionMeta,
+  getSessionMeta,
+} from './session-storage';
+import { useSessionEvents } from './useSessionEvents';
 
 const API = '/api/runtime';
 
+/** Normalize content field to text */
+function contentToText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map((c: any) => c.text || '').join('');
+  return '';
+}
+
 export function ChatPage() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [selected, setSelected] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // ── State ──────────────────────────────────────────────────
+  const [sessions, setSessions] = useState<{ key: string; updatedAt: number }[]>([]);
+  const [agents, setAgents] = useState<RuntimeAgent[]>([]);
+  const [selectedKey, setSelectedKey] = useState('');
+  const [messages, setMessages] = useState<TimelineItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [healthSource, setHealthSource] = useState('UNKNOWN');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['external']));
+  const [mobileTab, setMobileTab] = useState<'sessions' | 'workroom' | 'context'>('sessions');
+  const [contextFile, setContextFile] = useState<WorkspaceFileContent | null>(null);
+  const [showNewSession, setShowNewSession] = useState(false);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [newSessionObjective, setNewSessionObjective] = useState('');
+  const [newSessionAgent, setNewSessionAgent] = useState('sirius');
+  const [pendingMessages, setPendingMessages] = useState<Map<string, TimelineItem>>(new Map());
 
-  useEffect(() => {
-    fetch(`${API}/sessions`)
-      .then(r => r.json())
-      .then(d => {
-        const list = (d.data || []).map((s: any) => ({ key: s.key, updatedAt: s.updatedAt || 0 }));
-        setSessions(list);
-        if (list.length && !selected) setSelected(list[0].key);
-      })
-      .catch(e => setError(e.message));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load persisted preferences
+  const stored = useMemo(() => loadSessionData(), []);
+
+  // ── SSE events ─────────────────────────────────────────────
+  const { events: sseEvents, connected: sseConnected, sessionEvents } = useSessionEvents({
+    sessionKey: selectedKey,
+  });
+
+  // ── Load sessions from Gateway ─────────────────────────────
+  const loadSessions = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/sessions`);
+      const json: LastClawResponse<any[]> = await res.json();
+      const list = (json.data || []).map((s: any) => ({
+        key: s.key || s.sessionKey || '',
+        updatedAt: s.updatedAt || s.ts || Date.now(),
+      }));
+      setSessions(list);
+      setHealthSource(json.source || 'UNKNOWN');
+    } catch (e: any) {
+      setError(e.message);
+    }
   }, []);
 
+  // ── Load agents from Gateway ───────────────────────────────
+  const loadAgents = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/agents`);
+      const json: LastClawResponse<RuntimeAgent[]> = await res.json();
+      setAgents(json.data || []);
+    } catch { /* keep existing agents */ }
+  }, []);
+
+  // ── Initial load ───────────────────────────────────────────
+  useEffect(() => {
+    loadSessions();
+    loadAgents();
+    // Restore selected session
+    if (stored.selectedSessionKey) setSelectedKey(stored.selectedSessionKey);
+    if (stored.searchFilter) setSearchFilter(stored.searchFilter);
+    if (stored.collapsedSections) setCollapsedSections(new Set(stored.collapsedSections));
+    if (stored.mobileTab) setMobileTab(stored.mobileTab);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Load chat history for selected session ─────────────────
   const loadHistory = useCallback(async (sessionKey: string) => {
     if (!sessionKey) return;
     try {
-      const r = await fetch(`${API}/chat/${encodeURIComponent(sessionKey)}/history?limit=50`);
-      const d = await r.json();
-      const msgs = (d.data || []).map((m: any) => ({
-        role: m.role || 'user',
-        text: typeof m.content === 'string' ? m.content
-          : Array.isArray(m.content) ? m.content.map((c: any) => c.text || '').join('')
-          : m.text || '',
+      const res = await fetch(`${API}/chat/${encodeURIComponent(sessionKey)}/history?limit=50`);
+      const json = await res.json();
+      const msgs: TimelineItem[] = (json.data || []).map((m: any, i: number) => ({
+        id: `hist-${i}-${m.role || 'unknown'}`,
+        type: m.role === 'user' ? 'user-message' : 'agent-response',
+        role: m.role || 'system',
+        text: contentToText(m.content) || contentToText(m.text) || m.text || '',
+        agentId: m.agentId,
+        timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
+        source: 'REAL',
       }));
-      setMessages(msgs);
-    } catch (e: any) { setError(e.message); }
+      setMessages(msgs.filter(m => m.text.trim()));
+    } catch { /* history may be empty — not an error */ }
   }, []);
 
-  useEffect(() => { if (selected) loadHistory(selected); }, [selected, loadHistory]);
-
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+    if (selectedKey) {
+      loadHistory(selectedKey);
+      saveSessionData({ selectedSessionKey: selectedKey });
+      setMobileTab('workroom');
+    }
+  }, [selectedKey, loadHistory]);
 
-  async function send() {
-    if (!input.trim() || !selected || sending) return;
+  // ── Merge SSE events into messages ─────────────────────────
+  useEffect(() => {
+    if (!sessionEvents.length) return;
+    setMessages(prev => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const newItems: TimelineItem[] = [];
+      for (const evt of sessionEvents) {
+        if (existingIds.has(evt.id)) continue;
+        existingIds.add(evt.id);
+
+        if (evt.type === 'message.started' || evt.type === 'message.finished') {
+          const role = evt.text?.startsWith('[user]') ? 'user' : 'assistant';
+          const text = evt.text?.replace(/^\[user\]\s*/, '') || '';
+          if (!text) continue;
+          newItems.push({
+            id: evt.id,
+            type: role === 'user' ? 'user-message' : 'agent-response',
+            role,
+            text,
+            agentId: evt.agentId,
+            timestamp: new Date(evt.timestamp).getTime(),
+            source: 'LIVE',
+          });
+        } else if (evt.type === 'gateway.connected' || evt.type === 'gateway.disconnected') {
+          newItems.push({
+            id: evt.id,
+            type: 'connection-event',
+            role: 'system',
+            text: evt.type === 'gateway.connected' ? 'Gateway connected' : 'Gateway disconnected',
+            timestamp: new Date(evt.timestamp).getTime(),
+            source: 'LIVE',
+          });
+        } else if (evt.type === 'tool.started' || evt.type === 'tool.finished') {
+          newItems.push({
+            id: evt.id,
+            type: 'tool-event',
+            role: 'event',
+            text: `${evt.type === 'tool.started' ? 'Tool started' : 'Tool finished'}${evt.text ? `: ${evt.text.slice(0, 80)}` : ''}`,
+            agentId: evt.agentId,
+            timestamp: new Date(evt.timestamp).getTime(),
+            source: 'LIVE',
+          });
+        } else if (evt.type.includes('error')) {
+          newItems.push({
+            id: evt.id,
+            type: 'error',
+            role: 'error',
+            text: evt.text || evt.type,
+            agentId: evt.agentId,
+            timestamp: new Date(evt.timestamp).getTime(),
+            source: 'LIVE',
+          });
+        }
+      }
+      if (!newItems.length) return prev;
+      const merged = [...prev, ...newItems].sort((a, b) => a.timestamp - b.timestamp);
+      return merged.slice(-200); // cap
+    });
+  }, [sessionEvents]);
+
+  // ── Auto-scroll ────────────────────────────────────────────
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, pendingMessages]);
+
+  // ── Send message ───────────────────────────────────────────
+  const sendMessage = useCallback(async () => {
+    if (!input.trim() || !selectedKey || sending) return;
+
+    const msg = input.trim();
+    const agentId = getRuntimeAgentId(
+      getCanonicalAgentId(selectedKey.split(':')[1] || 'main')
+    );
+    const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // Validate message length
+    if (msg.length > 10000) {
+      setError('Message too long (max 10,000 characters)');
+      return;
+    }
+
     setSending(true);
     setError('');
-    const msg = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: msg }]);
+
+    // Add pending user message
+    const pendingMsg: TimelineItem = {
+      id: pendingId,
+      type: 'user-message',
+      role: 'user',
+      text: msg,
+      timestamp: Date.now(),
+      source: 'LOCAL',
+    };
+    setPendingMessages(prev => new Map(prev).set(pendingId, pendingMsg));
+
     try {
-      const r = await fetch(`${API}/chat`, {
+      const res = await fetch(`${API}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, sessionKey: selected, agentId: selected.split(':')[1] || 'main' }),
+        body: JSON.stringify({
+          message: msg,
+          sessionKey: selectedKey,
+          agentId,
+        }),
       });
-      const d = await r.json();
-      if (d.error) {
-        setError(d.error.message || d.error);
+      const json = await res.json();
+
+      if (json.error) {
+        setError(json.error.message || json.error);
+        setPendingMessages(prev => {
+          const next = new Map(prev);
+          next.delete(pendingId);
+          return next;
+        });
       } else {
-        setTimeout(() => loadHistory(selected), 5000);
+        // Move pending to confirmed messages
+        setMessages(prev => [...prev, { ...pendingMsg, source: 'REAL' }]);
+        setPendingMessages(prev => {
+          const next = new Map(prev);
+          next.delete(pendingId);
+          return next;
+        });
+
+        // Reload history after a delay to get agent response
+        setTimeout(() => loadHistory(selectedKey), 5000);
       }
-    } catch (e: any) { setError(e.message); }
-    setSending(false);
-  }
+    } catch (e: any) {
+      setError(e.message);
+      setPendingMessages(prev => {
+        const next = new Map(prev);
+        next.delete(pendingId);
+        return next;
+      });
+    } finally {
+      setSending(false);
+    }
+  }, [input, selectedKey, sending, loadHistory]);
+
+  // ── Create new session ─────────────────────────────────────
+  const createSession = useCallback(async () => {
+    if (!newSessionTitle.trim()) return;
+
+    const runtimeAgentId = getRuntimeAgentId(newSessionAgent);
+    const safeId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const sessionKey = `agent:${runtimeAgentId}:lastclaw:${safeId}`;
+
+    // Save metadata locally
+    const meta: SessionMetadata = {
+      title: newSessionTitle.trim(),
+      objective: newSessionObjective.trim(),
+      primaryAgentId: newSessionAgent,
+      participatingAgentIds: [newSessionAgent],
+      source: 'lastclaw-native',
+    };
+    saveSessionMeta(sessionKey, meta);
+
+    // Send first message through Gateway (this creates the session)
+    setSending(true);
+    try {
+      const res = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: meta.objective || `Session: ${meta.title}`,
+          sessionKey,
+          agentId: runtimeAgentId,
+        }),
+      });
+      const json = await res.json();
+
+      if (json.error) {
+        setError(json.error.message || 'Failed to create session');
+        return;
+      }
+
+      // Add to sessions list
+      setSessions(prev => [...prev, { key: sessionKey, updatedAt: Date.now() }]);
+      setSelectedKey(sessionKey);
+      setShowNewSession(false);
+      setNewSessionTitle('');
+      setNewSessionObjective('');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSending(false);
+    }
+  }, [newSessionTitle, newSessionObjective, newSessionAgent]);
+
+  // ── Workspace files ────────────────────────────────────────
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
+
+  const loadWorkspaceFiles = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/workspace/main/files?path=`);
+      const json = await res.json();
+      setWorkspaceFiles(json.data || []);
+    } catch { /* workspace may be unavailable */ }
+  }, []);
+
+  useEffect(() => {
+    loadWorkspaceFiles();
+  }, [loadWorkspaceFiles]);
+
+  const openFile = useCallback(async (filePath: string) => {
+    try {
+      const res = await fetch(`${API}/workspace/main/file?path=${encodeURIComponent(filePath)}`);
+      const json = await res.json();
+      setContextFile(json.data);
+    } catch { /* file may be unreadable */ }
+  }, []);
+
+  // ── Session classification ─────────────────────────────────
+  const classifiedSessions = useMemo(() => {
+    const native: typeof sessions = [];
+    const automation: typeof sessions = [];
+    const external: typeof sessions = [];
+
+    for (const s of sessions) {
+      const source = classifySessionSource(s.key);
+      const group = classifySessionGroup(source);
+      if (group === 'native') native.push(s);
+      else if (group === 'automation') automation.push(s);
+      else external.push(s);
+    }
+
+    // Sort by updatedAt desc
+    const sorter = (a: { updatedAt: number }, b: { updatedAt: number }) => b.updatedAt - a.updatedAt;
+    native.sort(sorter);
+    automation.sort(sorter);
+    external.sort(sorter);
+
+    return { native, automation, external };
+  }, [sessions]);
+
+  // ── Filter sessions ────────────────────────────────────────
+  const filteredNative = useMemo(() => {
+    if (!searchFilter.trim()) return classifiedSessions.native;
+    const q = searchFilter.toLowerCase();
+    return classifiedSessions.native.filter(s => {
+      const meta = getSessionMeta(s.key);
+      const title = deriveSessionTitle(s.key, meta || undefined);
+      return title.toLowerCase().includes(q) || s.key.toLowerCase().includes(q);
+    });
+  }, [classifiedSessions.native, searchFilter]);
+
+  // ── Selected session info ──────────────────────────────────
+  const selectedSession = sessions.find(s => s.key === selectedKey);
+  const selectedMeta = selectedKey ? getSessionMeta(selectedKey) : null;
+  const selectedSource = selectedKey ? classifySessionSource(selectedKey) : 'other';
+  const selectedBadge = getSourceBadge(selectedSource);
+  const selectedAgentName = selectedMeta?.primaryAgentId
+    ? getAgentName(selectedMeta.primaryAgentId)
+    : getAgentName(selectedKey.split(':')[1] || 'main');
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [sendMessage]);
+
+  // ── Toggle section collapse ────────────────────────────────
+  const toggleSection = useCallback((section: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      saveSessionData({ collapsedSections: Array.from(next) });
+      return next;
+    });
+  }, []);
+
+  // ── Mobile tab persistence ─────────────────────────────────
+  useEffect(() => {
+    saveSessionData({ mobileTab });
+  }, [mobileTab]);
+
+  // ── Render ─────────────────────────────────────────────────
+  return (
+    <div className="ns-page">
+      {/* ── LEFT: Session Navigator ── */}
+      <aside className={`ns-nav ${mobileTab === 'sessions' ? 'ns-mobile-active' : ''}`}>
+        <div className="ns-nav__header">
+          <h2 className="ns-nav__title">Workrooms</h2>
+          <button
+            className="ns-btn ns-btn--primary ns-btn--sm"
+            onClick={() => setShowNewSession(true)}
+          >
+            + New
+          </button>
+        </div>
+
+        <div className="ns-nav__search">
+          <input
+            type="text"
+            placeholder="Search sessions..."
+            value={searchFilter}
+            onChange={e => {
+              setSearchFilter(e.target.value);
+              saveSessionData({ searchFilter: e.target.value });
+            }}
+            className="ns-input"
+          />
+        </div>
+
+        <div className="ns-nav__list">
+          {/* Native Sessions */}
+          <div className="ns-nav__section">
+            <button
+              className="ns-nav__section-header"
+              onClick={() => toggleSection('native')}
+            >
+              <span>{collapsedSections.has('native') ? '▸' : '▾'} Native Sessions</span>
+              <span className="ns-nav__count">{filteredNative.length}</span>
+            </button>
+            {!collapsedSections.has('native') && (
+              <div className="ns-nav__section-items">
+                {filteredNative.map(s => (
+                  <SessionItem
+                    key={s.key}
+                    session={s}
+                    selected={s.key === selectedKey}
+                    onClick={() => setSelectedKey(s.key)}
+                  />
+                ))}
+                {filteredNative.length === 0 && (
+                  <div className="ns-nav__empty">No native sessions</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Automation / Cron */}
+          <div className="ns-nav__section">
+            <button
+              className="ns-nav__section-header"
+              onClick={() => toggleSection('automation')}
+            >
+              <span>{collapsedSections.has('automation') ? '▸' : '▾'} Automation</span>
+              <span className="ns-nav__count">{classifiedSessions.automation.length}</span>
+            </button>
+            {!collapsedSections.has('automation') && (
+              <div className="ns-nav__section-items">
+                {classifiedSessions.automation.map(s => (
+                  <SessionItem
+                    key={s.key}
+                    session={s}
+                    selected={s.key === selectedKey}
+                    onClick={() => setSelectedKey(s.key)}
+                  />
+                ))}
+                {classifiedSessions.automation.length === 0 && (
+                  <div className="ns-nav__empty">No automation sessions</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* External / Legacy */}
+          <div className="ns-nav__section">
+            <button
+              className="ns-nav__section-header"
+              onClick={() => toggleSection('external')}
+            >
+              <span>{collapsedSections.has('external') ? '▸' : '▾'} External / Legacy</span>
+              <span className="ns-nav__count">{classifiedSessions.external.length}</span>
+            </button>
+            {!collapsedSections.has('external') && (
+              <div className="ns-nav__section-items">
+                {classifiedSessions.external.map(s => (
+                  <SessionItem
+                    key={s.key}
+                    session={s}
+                    selected={s.key === selectedKey}
+                    onClick={() => setSelectedKey(s.key)}
+                  />
+                ))}
+                {classifiedSessions.external.length === 0 && (
+                  <div className="ns-nav__empty">No external sessions</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Connection status */}
+        <div className="ns-nav__footer">
+          <div className={`ns-status-dot ${sseConnected ? 'ns-status-dot--live' : 'ns-status-dot--off'}`} />
+          <span className="ns-nav__footer-text">
+            {sseConnected ? 'Live' : 'Disconnected'} · {healthSource}
+          </span>
+        </div>
+      </aside>
+
+      {/* ── CENTER: Workroom ── */}
+      <main className={`ns-workroom ${mobileTab === 'workroom' ? 'ns-mobile-active' : ''}`}>
+        {selectedKey ? (
+          <>
+            {/* Session header */}
+            <div className="ns-workroom__header">
+              <div className="ns-workroom__header-left">
+                <h3 className="ns-workroom__title">
+                  {deriveSessionTitle(selectedKey, selectedMeta || undefined)}
+                </h3>
+                <span
+                  className="ns-badge"
+                  style={{ background: selectedBadge.color + '20', color: selectedBadge.color, borderColor: selectedBadge.color + '40' }}
+                >
+                  {selectedBadge.label}
+                </span>
+                <span className="ns-workroom__agent">Agent: {selectedAgentName}</span>
+              </div>
+              <div className="ns-workroom__header-right">
+                {selectedSession && (
+                  <span className="ns-workroom__updated">
+                    {formatRelativeTime(selectedSession.updatedAt)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Timeline */}
+            <div className="ns-workroom__timeline" ref={scrollRef}>
+              {messages.map(item => (
+                <TimelineEntry key={item.id} item={item} />
+              ))}
+
+              {/* Pending messages */}
+              {Array.from(pendingMessages.values()).map(item => (
+                <TimelineEntry key={item.id} item={item} pending />
+              ))}
+
+              {messages.length === 0 && pendingMessages.size === 0 && (
+                <div className="ns-workroom__empty">
+                  <div className="ns-workroom__empty-icon">💬</div>
+                  <div className="ns-workroom__empty-text">No messages yet</div>
+                  <div className="ns-workroom__empty-hint">Send a message to start the session</div>
+                </div>
+              )}
+            </div>
+
+            {/* Error display */}
+            {error && (
+              <div className="ns-workroom__error">
+                <span className="ns-workroom__error-icon">⚠</span>
+                <span>{error}</span>
+                <button className="ns-workroom__error-close" onClick={() => setError('')}>×</button>
+              </div>
+            )}
+
+            {/* Composer */}
+            <div className="ns-workroom__composer">
+              <textarea
+                ref={inputRef}
+                className="ns-workroom__input"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={`Message ${selectedAgentName}...`}
+                disabled={sending}
+                rows={1}
+              />
+              <button
+                className="ns-btn ns-btn--primary"
+                onClick={sendMessage}
+                disabled={sending || !input.trim()}
+              >
+                {sending ? '...' : 'Send'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="ns-workroom__placeholder">
+            <div className="ns-workroom__placeholder-icon">🏠</div>
+            <div className="ns-workroom__placeholder-title">LastClaw Workroom</div>
+            <div className="ns-workroom__placeholder-desc">
+              Select a session from the navigator or create a new one
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ── RIGHT: Context Panel ── */}
+      <aside className={`ns-context ${mobileTab === 'context' ? 'ns-mobile-active' : ''}`}>
+        <div className="ns-context__header">
+          <h3 className="ns-context__title">Context</h3>
+        </div>
+
+        {selectedKey ? (
+          <div className="ns-context__body">
+            {/* Objective */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Objective</div>
+              <div className="ns-context__value">
+                {selectedMeta?.objective || <span className="ns-unknown">Not available</span>}
+              </div>
+            </div>
+
+            {/* Primary Agent */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Primary Agent</div>
+              <div className="ns-context__value ns-context__agent">
+                <div
+                  className="ns-agent-dot"
+                  style={{ background: CANONICAL_AGENTS.find(a => a.id === (selectedMeta?.primaryAgentId || 'sirius'))?.id === 'sirius' ? '#3b82f6' : '#8b5cf6' }}
+                />
+                {selectedAgentName}
+                <span className="ns-participation-badge ns-participation-badge--primary">Primary</span>
+              </div>
+            </div>
+
+            {/* Participating Agents */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Participating Agents</div>
+              <div className="ns-context__value">
+                {selectedMeta?.participatingAgentIds?.length ? (
+                  <div className="ns-context__agents">
+                    {selectedMeta.participatingAgentIds.map(id => (
+                      <div key={id} className="ns-context__agent-row">
+                        <div className="ns-agent-dot" style={{ background: '#6b7280' }} />
+                        {getAgentName(id)}
+                        <span className="ns-participation-badge ns-participation-badge--planned">Planned</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="ns-unknown">No additional agents</span>
+                )}
+              </div>
+            </div>
+
+            {/* Runtime State */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Runtime State</div>
+              <div className="ns-context__value">
+                <div className="ns-context__runtime">
+                  <span>Source: {healthSource}</span>
+                  <span>SSE: {sseConnected ? 'Connected' : 'Disconnected'}</span>
+                  <span>Events: {sessionEvents.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Related Files */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Workspace Files</div>
+              <div className="ns-context__value">
+                {workspaceFiles.length > 0 ? (
+                  <div className="ns-context__files">
+                    {workspaceFiles.filter(f => f.type === 'file').slice(0, 10).map(f => (
+                      <button
+                        key={f.path}
+                        className="ns-context__file"
+                        onClick={() => openFile(f.path)}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="ns-unknown">No files available</span>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Recent Activity</div>
+              <div className="ns-context__value">
+                {sseEvents.length > 0 ? (
+                  <div className="ns-context__activity">
+                    {sseEvents.slice(-5).reverse().map(evt => (
+                      <div key={evt.id} className="ns-context__activity-item">
+                        <span className="ns-context__activity-type">{evt.type}</span>
+                        <span className="ns-context__activity-time">{formatTime(new Date(evt.timestamp).getTime())}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="ns-unknown">No recent activity</span>
+                )}
+              </div>
+            </div>
+
+            {/* Result */}
+            <div className="ns-context__section">
+              <div className="ns-context__label">Result</div>
+              <div className="ns-context__value">
+                <span className="ns-unknown">No result yet</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="ns-context__empty">
+            Select a session to view context
+          </div>
+        )}
+      </aside>
+
+      {/* ── File Viewer Drawer ── */}
+      {contextFile && (
+        <div className="ns-drawer-overlay" onClick={() => setContextFile(null)}>
+          <div className="ns-drawer" onClick={e => e.stopPropagation()}>
+            <div className="ns-drawer__header">
+              <h3 className="ns-drawer__title">{contextFile.name}</h3>
+              <button className="ns-drawer__close" onClick={() => setContextFile(null)}>×</button>
+            </div>
+            <pre className="ns-drawer__content">{contextFile.content}</pre>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Session Dialog ── */}
+      {showNewSession && (
+        <div className="ns-dialog-overlay" onClick={() => setShowNewSession(false)}>
+          <div className="ns-dialog" onClick={e => e.stopPropagation()}>
+            <h3 className="ns-dialog__title">New Session</h3>
+
+            <label className="ns-dialog__label">
+              Title
+              <input
+                className="ns-input"
+                value={newSessionTitle}
+                onChange={e => setNewSessionTitle(e.target.value)}
+                placeholder="Session title..."
+                autoFocus
+              />
+            </label>
+
+            <label className="ns-dialog__label">
+              Objective
+              <textarea
+                className="ns-input ns-input--textarea"
+                value={newSessionObjective}
+                onChange={e => setNewSessionObjective(e.target.value)}
+                placeholder="What should this session accomplish?"
+                rows={3}
+              />
+            </label>
+
+            <label className="ns-dialog__label">
+              Primary Agent
+              <select
+                className="ns-input"
+                value={newSessionAgent}
+                onChange={e => setNewSessionAgent(e.target.value)}
+              >
+                {CANONICAL_AGENTS.map(a => (
+                  <option key={a.id} value={a.id}>{a.name} — {a.role}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="ns-dialog__actions">
+              <button
+                className="ns-btn ns-btn--ghost"
+                onClick={() => setShowNewSession(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="ns-btn ns-btn--primary"
+                onClick={createSession}
+                disabled={!newSessionTitle.trim() || sending}
+              >
+                {sending ? 'Creating...' : 'Create Session'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile Tab Bar ── */}
+      <nav className="ns-mobile-tabs">
+        <button
+          className={`ns-mobile-tab ${mobileTab === 'sessions' ? 'ns-mobile-tab--active' : ''}`}
+          onClick={() => setMobileTab('sessions')}
+        >
+          Sessions
+        </button>
+        <button
+          className={`ns-mobile-tab ${mobileTab === 'workroom' ? 'ns-mobile-tab--active' : ''}`}
+          onClick={() => setMobileTab('workroom')}
+        >
+          Workroom
+        </button>
+        <button
+          className={`ns-mobile-tab ${mobileTab === 'context' ? 'ns-mobile-tab--active' : ''}`}
+          onClick={() => setMobileTab('context')}
+        >
+          Context
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+/* ── Sub-components ───────────────────────────────────────── */
+
+function SessionItem({
+  session,
+  selected,
+  onClick,
+}: {
+  session: { key: string; updatedAt: number };
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const meta = getSessionMeta(session.key);
+  const title = deriveSessionTitle(session.key, meta || undefined);
+  const source = classifySessionSource(session.key);
+  const badge = getSourceBadge(source);
+  const agentName = meta?.primaryAgentId
+    ? getAgentName(meta.primaryAgentId)
+    : getAgentName(session.key.split(':')[1] || 'main');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 12, gap: 8 }}>
-      <select value={selected} onChange={e => setSelected(e.target.value)}
-        style={{ background: '#1a1a2e', color: '#e0e0ff', border: '1px solid #333', borderRadius: 6, padding: 8 }}>
-        {sessions.map(s => <option key={s.key} value={s.key}>{s.key}</option>)}
-      </select>
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{
-            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-            background: m.role === 'user' ? '#0a3d62' : '#1a1a2e',
-            color: '#e0e0ff', borderRadius: 8, padding: '8px 12px', maxWidth: '80%', fontSize: 13, lineHeight: 1.5,
-          }}>{m.text}</div>
-        ))}
+    <button
+      className={`ns-nav__item ${selected ? 'ns-nav__item--selected' : ''}`}
+      onClick={onClick}
+    >
+      <div className="ns-nav__item-title">{title}</div>
+      <div className="ns-nav__item-meta">
+        <span className="ns-nav__item-agent">{agentName}</span>
+        <span
+          className="ns-badge ns-badge--xs"
+          style={{ background: badge.color + '20', color: badge.color, borderColor: badge.color + '40' }}
+        >
+          {badge.label}
+        </span>
+        <span className="ns-nav__item-time">{formatRelativeTime(session.updatedAt)}</span>
       </div>
-      {error && <div style={{ color: '#ff6b6b', fontSize: 12 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="Type a message..." disabled={sending}
-          style={{ flex: 1, background: '#1a1a2e', color: '#e0e0ff', border: '1px solid #333', borderRadius: 6, padding: 10 }} />
-        <button onClick={send} disabled={sending || !input.trim()}
-          style={{ background: '#0a3d62', color: '#e0e0ff', border: '1px solid #4a9eff', borderRadius: 6, padding: '10px 16px', cursor: 'pointer' }}>
-          {sending ? '...' : 'Send'}
-        </button>
+    </button>
+  );
+}
+
+function TimelineEntry({ item, pending }: { item: TimelineItem; pending?: boolean }) {
+  const display = getTimelineTypeDisplay(item.type);
+
+  if (item.type === 'user-message') {
+    return (
+      <div className={`ns-tl ns-tl--user ${pending ? 'ns-tl--pending' : ''}`}>
+        <div className="ns-tl__bubble ns-tl__bubble--user">
+          {item.text}
+        </div>
+        <div className="ns-tl__time">{formatTime(item.timestamp)}</div>
       </div>
+    );
+  }
+
+  if (item.type === 'agent-response') {
+    return (
+      <div className={`ns-tl ns-tl--agent ${pending ? 'ns-tl--pending' : ''}`}>
+        <div className="ns-tl__avatar">
+          <div className="ns-agent-dot ns-agent-dot--lg" style={{ background: '#8b5cf6' }} />
+        </div>
+        <div>
+          <div className="ns-tl__bubble ns-tl__bubble--agent">
+            {item.text}
+          </div>
+          <div className="ns-tl__time">
+            {item.agentId && <span className="ns-tl__agent">{getAgentName(item.agentId)}</span>}
+            {formatTime(item.timestamp)}
+            {item.source === 'LIVE' && <span className="ns-tl__source">LIVE</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // System, tool, connection, error events
+  return (
+    <div className="ns-tl ns-tl--event">
+      <span className="ns-tl__event-icon" style={{ color: display.color }}>{display.icon}</span>
+      <span className="ns-tl__event-text">{item.text}</span>
+      <span className="ns-tl__time">{formatTime(item.timestamp)}</span>
     </div>
   );
 }
