@@ -122,7 +122,7 @@ export class OpenClawAdapter {
     ]);
 
     return rawAgents.map((raw: any) => {
-      const runtimeAgentId = raw.id || '';
+      const runtimeAgentId = raw.agentId || raw.id || '';
       const canonicalId = reverseMap.get(runtimeAgentId) || runtimeAgentId;
       const manifestAgent = manifest.agents[canonicalId];
       const rawAvail = (raw.availability || 'UNKNOWN').toUpperCase();
