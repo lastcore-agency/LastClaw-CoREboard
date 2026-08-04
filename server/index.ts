@@ -6,6 +6,7 @@ import { eventStreamRouter } from './routes/events.js';
 import { workspaceRouter } from './routes/workspace.js';
 import { diagnosticsRouter } from './routes/diagnostics.js';
 import { transcriptRouter } from './routes/transcript.js';
+import { flowsRouter } from './routes/flows.js';
 import { shutdownAdapter } from './runtime/OpenClawAdapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +23,7 @@ app.use('/api/runtime', eventStreamRouter);
 app.use('/api/runtime', workspaceRouter);
 app.use('/api/runtime', diagnosticsRouter);
 app.use('/api/runtime', transcriptRouter);
+app.use('/api/runtime', flowsRouter);
 
 // Serve frontend in production
 const isProd = process.env.NODE_ENV === 'production';

@@ -9,6 +9,7 @@ import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { fetchAgents, fetchGateway } from './lib/openclaw';
 import { useAgentEvents } from './lib/useAgentEvents';
+import { applyFlowPresence, useFlowPresence } from './lib/useFlowPresence';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ChatPage } from './components/chat/ChatPage';
 import { StudioPage } from './components/studio/StudioPage';
@@ -36,6 +37,7 @@ export default function App() {
 
   const isMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
   const { bubbles } = useAgentEvents(isMock);
+  const flowPresence = useFlowPresence(!isMock);
 
   const [layoutOrder, setLayoutOrder] = useState<LayoutOrder>(() => {
     const saved = localStorage.getItem('coreboard:center-layout-order');
@@ -66,7 +68,8 @@ export default function App() {
     return () => { alive = false; };
   }, []);
 
-  const selectedAgent = useMemo(() => agents.find((a) => a.id === selectedId), [agents, selectedId]);
+  const displayedAgents = useMemo(() => applyFlowPresence(agents, flowPresence), [agents, flowPresence]);
+  const selectedAgent = useMemo(() => displayedAgents.find((a) => a.id === selectedId), [displayedAgents, selectedId]);
 
   function handleSelectAgent(agentId: string) {
     setSelectedId(agentId);
@@ -114,21 +117,21 @@ export default function App() {
                 <>
                   <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
                     <main className="app-main">
-                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
+                      <VisualOffice agents={displayedAgents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
                     </main>
                   </motion.div>
                   <motion.div layout key="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-                    <RuntimeSummary agents={agents} gateway={gateway} />
+                    <RuntimeSummary agents={displayedAgents} gateway={gateway} />
                   </motion.div>
                 </>
               ) : (
                 <>
                   <motion.div layout key="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-                    <RuntimeSummary agents={agents} gateway={gateway} />
+                    <RuntimeSummary agents={displayedAgents} gateway={gateway} />
                   </motion.div>
                   <motion.div layout key="office" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
                     <main className="app-main">
-                      <VisualOffice agents={agents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
+                      <VisualOffice agents={displayedAgents} gateway={gateway} selectedId={selectedId} onSelect={handleSelectAgent} eventBubbles={bubbles} />
                     </main>
                   </motion.div>
                 </>
