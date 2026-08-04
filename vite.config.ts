@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Keep authored TypeScript as the browser source of truth even when a
+  // developer has stale, untracked JavaScript emit files beside it.
+  resolve: {
+    extensions: ['.mjs', '.mts', '.ts', '.tsx', '.js', '.jsx', '.json'],
+  },
   test: {
     environment: 'node',
     include: ['server/test/**/*.test.ts'],
