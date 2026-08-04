@@ -105,9 +105,11 @@ export const mockAgents: Agent[] = [
     x: 56,
     y: 22,
     position: {
-      desktop: { x: 52, y: 32, scale: 1 },
-      tablet:  { x: 52, y: 30, scale: 0.9 },
-      mobile:  { x: 50, y: 26, scale: 0.8 },
+      // Keep the Owner Room clear: Last Boss is the central owner presence,
+      // while Draco belongs to the production side of the SiX-SQUAD office.
+      desktop: { x: 34, y: 29, scale: 1 },
+      tablet:  { x: 35, y: 28, scale: 0.9 },
+      mobile:  { x: 36, y: 25, scale: 0.8 },
     },
     character: {
       animated: '/characters/draco/idle-front.webp',
