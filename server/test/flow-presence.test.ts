@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mockAgents } from '../../src/data/mockAgents';
-import { applyFlowPresence, type FlowPresence } from '../../src/lib/useFlowPresence';
+import { mockAgents } from '../../src/data/mockAgents.js';
+import { applyFlowPresence, type FlowPresence } from '../../src/lib/useFlowPresence.js';
 
 function flow(patch: Partial<FlowPresence>): FlowPresence {
   return {
