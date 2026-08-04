@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mockAgents } from '../../src/data/mockAgents.js';
-import { applyFlowPresence, type FlowPresence } from '../../src/lib/useFlowPresence.js';
+import { mockAgents } from '../data/mockAgents';
+import { applyFlowPresence, type FlowPresence } from './useFlowPresence';
 
 function flow(patch: Partial<FlowPresence>): FlowPresence {
   return {
@@ -53,3 +53,4 @@ describe('real flow presence projection', () => {
     expect(sirius?.source).toBe('REAL');
   });
 });
+
