@@ -12,7 +12,7 @@ import { env } from '../config/env.js';
 export const transcriptRouter = express.Router();
 
 const MAX_MESSAGES = 200;
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 /** Redact sensitive content from text */
 function redactContent(text: string): string {
@@ -37,11 +37,12 @@ function redactContent(text: string): string {
 function extractText(content: unknown): string {
   if (typeof content === 'string') return redactContent(content);
   if (Array.isArray(content)) {
-    return content
+    const joined = content
       .filter((c: any) => c.type === 'text')
       .map((c: any) => c.text || '')
       .join('\n')
       .slice(0, 4000);
+    return redactContent(joined);
   }
   return '';
 }
@@ -122,8 +123,10 @@ function parseTranscript(sessionFile: string, limit: number): Array<{
     model?: string;
   }> = [];
 
-  for (const line of lines) {
-    if (messages.length >= limit) break;
+  // Read newest entries first so long transcripts return the latest conversation,
+  // then restore chronological order for the browser timeline.
+  for (let index = lines.length - 1; index >= 0 && messages.length < limit; index -= 1) {
+    const line = lines[index];
 
     try {
       const entry = JSON.parse(line);
@@ -145,15 +148,15 @@ function parseTranscript(sessionFile: string, limit: number): Array<{
         role: msg.role,
         text,
         timestamp: entry.timestamp || msg.timestamp || '',
-        agentId: entry.message?.provider,
-        model: entry.message?.model,
+        agentId: msg.agentId || msg.provider,
+        model: msg.model,
       });
     } catch {
       // Skip malformed lines
     }
   }
 
-  return messages;
+  return messages.reverse();
 }
 
 // ── Transcript endpoint ──────────────────────────────────────

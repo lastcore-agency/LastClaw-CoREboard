@@ -85,6 +85,7 @@ export interface NormalizedEvent {
   targetAgentId?: string;
   sessionId?: string;
   text?: string;
+  role?: 'user' | 'assistant' | 'system' | 'tool';
   source: 'LIVE' | 'MOCK';
   meta?: Record<string, unknown>;
 }

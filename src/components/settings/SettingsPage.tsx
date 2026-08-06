@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useSettings } from '../../contexts/SettingsContext';
+import { DiagnosticsPage } from '../diagnostics/DiagnosticsPage';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10, filter: 'blur(4px)', scale: 0.99 },
@@ -26,7 +27,8 @@ export function SettingsPage() {
 
   return (
     <motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" className="page-container">
-      <div className="premium-card" style={{ maxWidth: 600, margin: '0 auto', padding: '24px' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="premium-card" style={{ padding: '24px' }}>
         <div className="premium-border-trail" aria-hidden="true" />
         <h2 style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 700 }}>Settings</h2>
         
@@ -75,6 +77,10 @@ export function SettingsPage() {
             </button>
           </div>
         </form>
+        </div>
+        <div className="premium-card" style={{ overflow: 'hidden' }}>
+          <DiagnosticsPage />
+        </div>
       </div>
     </motion.div>
   );

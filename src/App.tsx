@@ -12,7 +12,7 @@ import { useAgentEvents } from './lib/useAgentEvents';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ChatPage } from './components/chat/ChatPage';
 import { StudioPage } from './components/studio/StudioPage';
-import { DiagnosticsPage } from './components/diagnostics/DiagnosticsPage';
+import { BoardPage } from './components/board/BoardPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
 import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
 
@@ -140,7 +140,7 @@ export default function App() {
         {activePage === 'settings' && <SettingsPage key="settings" />}
         {activePage === 'chat' && <ChatPage key="chat" />}
         {activePage === 'studio' && <StudioPage key="studio" />}
-        {activePage === 'board' && <DiagnosticsPage key="diagnostics" />}
+        {activePage === 'board' && <BoardPage key="board" onOpenChat={() => setActivePage('chat')} />}
 
         {false && ['placeholder'].includes(activePage) && (
           <motion.div key={activePage} variants={pageVariants} initial="initial" animate="animate" exit="exit" className="placeholder-page">

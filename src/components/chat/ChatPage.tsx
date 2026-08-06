@@ -35,13 +35,76 @@ import {
 } from './session-storage';
 import { useSessionEvents } from './useSessionEvents';
 
-const API = '/api/runtime';
+const API = import.meta.env.VITE_OPENCLAW_API_BASE || '/api/runtime';
 
 /** Normalize content field to text */
 function contentToText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) return content.map((c: any) => c.text || '').join('');
   return '';
+}
+
+
+function normalizeTimestamp(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 10_000_000_000 ? value * 1000 : value;
+  }
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && value.trim() !== '') {
+      return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return Date.now();
+}
+
+function textHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function timelineContentSignature(item: TimelineItem): string {
+  return `${item.type}:${item.text.trim().replace(/\s+/g, ' ')}`;
+}
+
+function sourcePriority(source: TimelineItem['source']): number {
+  if (source === 'LIVE') return 3;
+  if (source === 'REAL') return 2;
+  return 1;
+}
+
+function mergeTimelineItems(current: TimelineItem[], incoming: TimelineItem[]): TimelineItem[] {
+  const merged: TimelineItem[] = [];
+  const candidates = [...current, ...incoming].sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const candidate of candidates) {
+    const duplicateIndex = merged.findIndex((existing) =>
+      existing.type === candidate.type &&
+      existing.text.trim() === candidate.text.trim() &&
+      Math.abs(existing.timestamp - candidate.timestamp) <= 15_000
+    );
+
+    if (duplicateIndex < 0) {
+      merged.push(candidate);
+      continue;
+    }
+
+    if (sourcePriority(candidate.source) >= sourcePriority(merged[duplicateIndex].source)) {
+      merged[duplicateIndex] = candidate;
+    }
+  }
+
+  return merged.sort((a, b) => a.timestamp - b.timestamp).slice(-200);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function ChatPage() {
@@ -52,6 +115,7 @@ export function ChatPage() {
   const [messages, setMessages] = useState<TimelineItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [awaitingReply, setAwaitingReply] = useState(false);
   const [error, setError] = useState('');
   const [healthSource, setHealthSource] = useState('UNKNOWN');
   const [searchFilter, setSearchFilter] = useState('');
@@ -66,6 +130,8 @@ export function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const selectedKeyRef = useRef('');
+  const pollGenerationRef = useRef(0);
 
   // Load persisted preferences
   const stored = useMemo(() => loadSessionData(), []);
@@ -82,7 +148,7 @@ export function ChatPage() {
       const json: LastClawResponse<any[]> = await res.json();
       const list = (json.data || []).map((s: any) => ({
         key: s.key || s.sessionKey || '',
-        updatedAt: s.updatedAt || s.ts || Date.now(),
+        updatedAt: normalizeTimestamp(s.updatedAt || s.ts || s.lastActiveAt),
       }));
       setSessions(list);
       setHealthSource(json.source || 'UNKNOWN');
@@ -111,31 +177,51 @@ export function ChatPage() {
     if (stored.mobileTab) setMobileTab(stored.mobileTab);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep async history polling scoped to the currently selected workroom.
+  useEffect(() => {
+    selectedKeyRef.current = selectedKey;
+    pollGenerationRef.current += 1;
+    setMessages([]);
+    setPendingMessages(new Map());
+    setAwaitingReply(false);
+  }, [selectedKey]);
+
   // ── Load chat history for selected session ─────────────────
-  const loadHistory = useCallback(async (sessionKey: string) => {
-    if (!sessionKey) return;
+  const loadHistory = useCallback(async (sessionKey: string): Promise<TimelineItem[]> => {
+    if (!sessionKey) return [];
     try {
-      const res = await fetch(`${API}/transcript/${encodeURIComponent(sessionKey)}?limit=50`);
+      const res = await fetch(`${API}/transcript/${encodeURIComponent(sessionKey)}?limit=100`);
+      if (!res.ok) throw new Error(`Transcript request failed (${res.status})`);
       const json = await res.json();
-      const msgs: TimelineItem[] = (json.data || []).map((m: any, i: number) => ({
-        id: `hist-${i}-${m.role || 'unknown'}`,
-        type: m.role === 'user' ? 'user-message' : 'agent-response',
-        role: m.role || 'system',
-        text: m.text || '',
-        agentId: m.model,
-        timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
-        source: 'REAL',
-      }));
-      setMessages(msgs.filter(m => m.text.trim()));
-      setHealthSource(json.source || 'UNKNOWN');
+      const msgs: TimelineItem[] = (json.data || []).map((m: any, i: number) => {
+        const timestamp = normalizeTimestamp(m.timestamp);
+        const text = String(m.text || '');
+        return {
+          id: `hist-${m.role || 'unknown'}-${m.timestamp || `index-${i}`}-${textHash(text)}`,
+          type: m.role === 'user' ? 'user-message' : 'agent-response',
+          role: m.role || 'system',
+          text,
+          agentId: m.agentId,
+          timestamp,
+          source: 'REAL',
+          metadata: m.model ? { model: m.model } : undefined,
+        };
+      }).filter((message: TimelineItem) => message.text.trim());
+
+      if (selectedKeyRef.current === sessionKey) {
+        setMessages((previous) => mergeTimelineItems(previous, msgs));
+        setHealthSource(json.source || 'UNKNOWN');
+      }
+      return msgs;
     } catch {
-      setHealthSource('UNREACHABLE');
+      if (selectedKeyRef.current === sessionKey) setHealthSource('UNREACHABLE');
+      return [];
     }
   }, []);
 
   useEffect(() => {
     if (selectedKey) {
-      loadHistory(selectedKey);
+      void loadHistory(selectedKey);
       saveSessionData({ selectedSessionKey: selectedKey });
       setMobileTab('workroom');
     }
@@ -151,8 +237,15 @@ export function ChatPage() {
         if (existingIds.has(evt.id)) continue;
         existingIds.add(evt.id);
 
-        if (evt.type === 'message.started' || evt.type === 'message.finished') {
-          const role = evt.text?.startsWith('[user]') ? 'user' : 'assistant';
+        const isMessageEvent =
+          evt.type === 'session.message' ||
+          evt.type === 'chat.message' ||
+          evt.type.startsWith('message.') ||
+          evt.type.endsWith('.message');
+
+        if (isMessageEvent) {
+          const inferredRole = evt.text?.startsWith('[user]') ? 'user' : 'assistant';
+          const role = evt.role === 'user' || evt.role === 'assistant' ? evt.role : inferredRole;
           const text = evt.text?.replace(/^\[user\]\s*/, '') || '';
           if (!text) continue;
           newItems.push({
@@ -161,7 +254,7 @@ export function ChatPage() {
             role,
             text,
             agentId: evt.agentId,
-            timestamp: new Date(evt.timestamp).getTime(),
+            timestamp: normalizeTimestamp(evt.timestamp),
             source: 'LIVE',
           });
         } else if (evt.type === 'gateway.connected' || evt.type === 'gateway.disconnected') {
@@ -196,8 +289,7 @@ export function ChatPage() {
         }
       }
       if (!newItems.length) return prev;
-      const merged = [...prev, ...newItems].sort((a, b) => a.timestamp - b.timestamp);
-      return merged.slice(-200); // cap
+      return mergeTimelineItems(prev, newItems);
     });
   }, [sessionEvents]);
 
@@ -208,15 +300,50 @@ export function ChatPage() {
     }
   }, [messages, pendingMessages]);
 
+  const pollForAssistantResponse = useCallback(async (
+    sessionKey: string,
+    sentAt: number,
+    knownAssistantSignatures: string[],
+    generation: number,
+  ) => {
+    const known = new Set(knownAssistantSignatures);
+    setAwaitingReply(true);
+
+    try {
+      for (let attempt = 0; attempt < 36; attempt += 1) {
+        await sleep(attempt === 0 ? 1500 : 2500);
+        if (selectedKeyRef.current !== sessionKey || pollGenerationRef.current !== generation) return;
+
+        const latest = await loadHistory(sessionKey);
+        const hasNewAssistant = latest.some((item) =>
+          item.type === 'agent-response' &&
+          item.timestamp >= sentAt - 10_000 &&
+          !known.has(timelineContentSignature(item))
+        );
+
+        if (hasNewAssistant) return;
+      }
+    } finally {
+      if (selectedKeyRef.current === sessionKey && pollGenerationRef.current === generation) {
+        setAwaitingReply(false);
+      }
+    }
+  }, [loadHistory]);
+
   // ── Send message ───────────────────────────────────────────
   const sendMessage = useCallback(async () => {
-    if (!input.trim() || !selectedKey || sending) return;
+    if (!input.trim() || !selectedKey || sending || awaitingReply) return;
 
     const msg = input.trim();
     const agentId = getRuntimeAgentId(
       getCanonicalAgentId(selectedKey.split(':')[1] || 'main')
     );
-    const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sentAt = Date.now();
+    const pendingId = `pending-${sentAt}-${Math.random().toString(36).slice(2, 8)}`;
+    const knownAssistantSignatures = messages
+      .filter((item) => item.type === 'agent-response')
+      .map(timelineContentSignature);
+    const pollGeneration = pollGenerationRef.current;
 
     // Validate message length
     if (msg.length > 10000) {
@@ -234,7 +361,7 @@ export function ChatPage() {
       type: 'user-message',
       role: 'user',
       text: msg,
-      timestamp: Date.now(),
+      timestamp: sentAt,
       source: 'LOCAL',
     };
     setPendingMessages(prev => new Map(prev).set(pendingId, pendingMsg));
@@ -259,16 +386,21 @@ export function ChatPage() {
           return next;
         });
       } else {
-        // Move pending to confirmed messages
-        setMessages(prev => [...prev, { ...pendingMsg, source: 'REAL' }]);
+        // Move pending to confirmed messages without losing live or transcript items.
+        setMessages((previous) => mergeTimelineItems(previous, [{ ...pendingMsg, source: 'REAL' }]));
         setPendingMessages(prev => {
           const next = new Map(prev);
           next.delete(pendingId);
           return next;
         });
 
-        // Reload history after a delay to get agent response
-        setTimeout(() => loadHistory(selectedKey), 5000);
+        // Poll the real transcript until the assistant response arrives.
+        void pollForAssistantResponse(
+          selectedKey,
+          sentAt,
+          knownAssistantSignatures,
+          pollGeneration,
+        );
       }
     } catch (e: any) {
       setError(e.message);
@@ -280,7 +412,7 @@ export function ChatPage() {
     } finally {
       setSending(false);
     }
-  }, [input, selectedKey, sending, loadHistory]);
+  }, [input, selectedKey, sending, awaitingReply, messages, pollForAssistantResponse]);
 
   // ── Create new session ─────────────────────────────────────
   const createSession = useCallback(async () => {
@@ -604,15 +736,15 @@ export function ChatPage() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Message ${selectedAgentName}...`}
-                disabled={sending}
+                disabled={sending || awaitingReply}
                 rows={1}
               />
               <button
                 className="ns-btn ns-btn--primary"
                 onClick={sendMessage}
-                disabled={sending || !input.trim()}
+                disabled={sending || awaitingReply || !input.trim()}
               >
-                {sending ? '...' : 'Send'}
+                {sending ? 'Sending…' : awaitingReply ? 'Waiting…' : 'Send'}
               </button>
             </div>
           </>
