@@ -14,7 +14,7 @@ import { ChatPage } from './components/chat/ChatPage';
 import { StudioPage } from './components/studio/StudioPage';
 import { BoardPage } from './components/board/BoardPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
-import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
+import type { Agent, GatewaySnapshot, NavPage } from './types';
 
 type LayoutOrder = 'office-first' | 'status-first';
 
@@ -32,7 +32,6 @@ export default function App() {
   const [activePage, setActivePage] = useState<NavPage>('center');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [connectionState] = useState<ConnectionState>('connected');
 
   const isMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
   const { bubbles } = useAgentEvents(isMock);
@@ -51,19 +50,20 @@ export default function App() {
     let alive = true;
     async function load() {
       try {
-        setLoading(true);
         const [agentData, gatewayData] = await Promise.all([fetchAgents(), fetchGateway()]);
         if (!alive) return;
         setAgents(agentData);
         setGateway(gatewayData);
       } catch (err) {
+        if (!alive) return;
         setError(err instanceof Error ? err.message : 'Failed to load');
       } finally {
         if (alive) setLoading(false);
       }
     }
     void load();
-    return () => { alive = false; };
+    const timer = window.setInterval(load, 10_000);
+    return () => { alive = false; window.clearInterval(timer); };
   }, []);
 
   const selectedAgent = useMemo(() => agents.find((a) => a.id === selectedId), [agents, selectedId]);
