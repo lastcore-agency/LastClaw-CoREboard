@@ -10,3 +10,8 @@ __MACOSX/
 *.tsbuildinfo
 dist-server
 artifacts/screenshots/live-runtime/
+test-results/
+# Compiled JS artifacts that may appear in src/ from tsc or VM runs
+src/**/*.js
+src/**/*.d.ts
+!src/vite-env.d.ts
