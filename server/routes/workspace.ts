@@ -1,29 +1,16 @@
 /* ────────────────────────────────────────────────────────────
    Workspace — safe read-only server-side file access
-   Rejects traversal, absolute paths, secrets, symlinks
+   Rejects traversal, absolute paths, secrets, symlinks.
+   Uses Canonical Agent Workspace Resolver for per-agent isolation.
    ──────────────────────────────────────────────────────────── */
 
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { env } from '../config/env.js';
+import { resolveAgentWorkspace, resolveAllAgentWorkspaces } from '../runtime/workspaceResolver.js';
 import type { LastClawResponse } from '../runtime/types.js';
 
 export const workspaceRouter = express.Router();
-
-/** Canonical workspace roots — uses OPENCLAW_HOME for shared workspace */
-function getWorkspaceRoots(): Record<string, string> {
-  const openclawHome = process.env.OPENCLAW_HOME || path.join(process.env.HOME || '~', '.openclaw');
-  return {
-    'shared': path.join(openclawHome, 'workspace'),
-    'main': path.join(openclawHome, 'workspace'),
-    'draco': path.join(openclawHome, 'workspace'),
-    'polaris': path.join(openclawHome, 'workspace'),
-    'antares': path.join(openclawHome, 'workspace'),
-    'altair': path.join(openclawHome, 'workspace'),
-    'capella': path.join(openclawHome, 'workspace'),
-  };
-}
 
 /** Blocked filenames/patterns */
 const BLOCKED_FILES = new Set([
@@ -52,37 +39,44 @@ function isSecretFile(filePath: string): boolean {
   return false;
 }
 
-/** Resolve and validate workspace path */
-function resolveWorkspacePath(
+/** Resolve and validate workspace path using Canonical Resolver */
+export function resolveWorkspacePath(
   agentId: string,
   filePath: string,
-): { ok: true; resolved: string; root: string } | { ok: false; status: number; error: string } {
-  const roots = getWorkspaceRoots();
-  const root = roots[agentId];
-  if (!root) {
-    return { ok: false, status: 404, error: `Unknown agent: ${agentId}` };
+): { ok: true; resolved: string; root: string } | { ok: false; status: number; error: string; code: string } {
+  const resolution = resolveAgentWorkspace(agentId);
+  if (!resolution.ok) {
+    return {
+      ok: false,
+      status: 404,
+      error: `WORKSPACE_NOT_RESOLVED: agentId=${agentId}`,
+      code: resolution.error || 'WORKSPACE_NOT_RESOLVED',
+    };
   }
+
+  const root = resolution.workspacePath;
 
   // Reject absolute paths
   if (path.isAbsolute(filePath)) {
-    return { ok: false, status: 400, error: 'Absolute paths not allowed' };
+    return { ok: false, status: 400, error: 'Absolute paths not allowed', code: 'INVALID_PATH' };
   }
 
   // Reject traversal
   if (filePath.includes('..')) {
-    return { ok: false, status: 400, error: 'Path traversal not allowed' };
+    return { ok: false, status: 400, error: 'Path traversal not allowed', code: 'PATH_TRAVERSAL' };
   }
 
   const resolved = path.resolve(root, filePath);
   if (!resolved.startsWith(root)) {
-    return { ok: false, status: 403, error: 'Path escapes workspace root' };
+    return { ok: false, status: 403, error: 'Path escapes workspace root', code: 'PATH_ESCAPES_ROOT' };
   }
 
   // Check for symlink escape
   try {
+    const realRoot = fs.existsSync(root) ? fs.realpathSync(root) : root;
     const realPath = fs.realpathSync(resolved);
-    if (!realPath.startsWith(root)) {
-      return { ok: false, status: 403, error: 'Symlink escapes workspace root' };
+    if (!realPath.startsWith(realRoot)) {
+      return { ok: false, status: 403, error: 'Symlink escapes workspace root', code: 'SYMLINK_ESCAPES_ROOT' };
     }
   } catch {
     // File doesn't exist yet — that's fine for stat check
@@ -91,6 +85,32 @@ function resolveWorkspacePath(
   return { ok: true, resolved, root };
 }
 
+// ── Resolve workspace route (diagnostic endpoint) ───────────
+workspaceRouter.get('/workspace/:agentId/resolve', (req, res) => {
+  const { agentId } = req.params;
+  const resolution = resolveAgentWorkspace(agentId);
+  if (!resolution.ok) {
+    res.status(404).json({
+      data: null,
+      source: 'ERROR',
+      observedAt: new Date().toISOString(),
+      stale: false,
+      error: {
+        code: resolution.error,
+        message: resolution.message,
+        agentId: resolution.agentId,
+      },
+    });
+    return;
+  }
+  res.json({
+    data: resolution,
+    source: 'REAL',
+    observedAt: new Date().toISOString(),
+    stale: false,
+  });
+});
+
 // ── List workspace files ────────────────────────────────────
 workspaceRouter.get('/workspace/:agentId/files', (req, res) => {
   const { agentId } = req.params;
@@ -98,14 +118,18 @@ workspaceRouter.get('/workspace/:agentId/files', (req, res) => {
 
   const validation = resolveWorkspacePath(agentId, filePath || '.');
   if (!validation.ok) {
-    res.status(validation.status).json({ error: validation.error });
+    res.status(validation.status).json({
+      error: validation.error,
+      code: validation.code,
+      agentId,
+    });
     return;
   }
 
   try {
     const stat = fs.statSync(validation.resolved);
     if (!stat.isDirectory()) {
-      res.status(400).json({ error: 'Path is not a directory' });
+      res.status(400).json({ error: 'Path is not a directory', code: 'NOT_A_DIRECTORY' });
       return;
     }
 
@@ -130,10 +154,10 @@ workspaceRouter.get('/workspace/:agentId/files', (req, res) => {
     } satisfies LastClawResponse<typeof files>);
   } catch (err: any) {
     if (err.code === 'ENOENT') {
-      res.status(404).json({ error: 'Path not found' });
+      res.status(404).json({ error: 'Path not found', code: 'ENOENT' });
       return;
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -142,31 +166,35 @@ workspaceRouter.get('/workspace/:agentId/file', (req, res) => {
   const { agentId } = req.params;
   const filePath = req.query.path as string;
   if (!filePath) {
-    res.status(400).json({ error: 'path query param required' });
+    res.status(400).json({ error: 'path query param required', code: 'MISSING_PARAM' });
     return;
   }
 
   const validation = resolveWorkspacePath(agentId, filePath);
   if (!validation.ok) {
-    res.status(validation.status).json({ error: validation.error });
+    res.status(validation.status).json({
+      error: validation.error,
+      code: validation.code,
+      agentId,
+    });
     return;
   }
 
   if (isSecretFile(filePath)) {
-    res.status(403).json({ error: 'File blocked (secret/credential pattern)' });
+    res.status(403).json({ error: 'File blocked (secret/credential pattern)', code: 'FILE_BLOCKED' });
     return;
   }
 
   try {
     const stat = fs.statSync(validation.resolved);
     if (stat.isDirectory()) {
-      res.status(400).json({ error: 'Path is a directory, not a file' });
+      res.status(400).json({ error: 'Path is a directory, not a file', code: 'IS_DIRECTORY' });
       return;
     }
 
     // Limit file size to 500KB
     if (stat.size > 500 * 1024) {
-      res.status(413).json({ error: `File too large (${stat.size} bytes, max 500KB)` });
+      res.status(413).json({ error: `File too large (${stat.size} bytes, max 500KB)`, code: 'FILE_TOO_LARGE' });
       return;
     }
 
@@ -186,9 +214,9 @@ workspaceRouter.get('/workspace/:agentId/file', (req, res) => {
     });
   } catch (err: any) {
     if (err.code === 'ENOENT') {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: 'File not found', code: 'ENOENT' });
       return;
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });

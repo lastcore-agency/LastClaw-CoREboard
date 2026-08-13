@@ -115,3 +115,53 @@ describe('getStaticAsset', () => {
     expect(asset).toContain('static-front.webp');
   });
 });
+
+// ── REGRESSION: LIVE mode produces no demo activity ─────────
+describe('LIVE mode: no synthetic/demo activity (isMock=false)', () => {
+  it('LIVE: online agent → idle or atDesk (ambient only, never fake walking)', () => {
+    const agent = makeAgent({ status: 'online' });
+    const state = deriveMotionState(agent, false);
+    expect(state).not.toBe('walking');
+    expect(['idle', 'atDesk']).toContain(state);
+  });
+
+  it('LIVE: working agent → atDesk (active desk state, not demo walking)', () => {
+    const agent = makeAgent({ status: 'working' });
+    const state = deriveMotionState(agent, false);
+    expect(state).toBe('atDesk'); // LIVE: working shows at-desk, not walking
+    expect(state).not.toBe('walking');
+  });
+
+  it('LIVE: waiting agent → atDesk (shows presence, not walking)', () => {
+    const agent = makeAgent({ status: 'waiting' });
+    // LIVE: waiting maps to atDesk ambient — never fake walking
+    expect(deriveMotionState(agent, false)).not.toBe('walking');
+  });
+
+  it('LIVE: unknown agent → never offline without proof, never walking', () => {
+    const agent = makeAgent({ status: 'unknown' });
+    const state = deriveMotionState(agent, false);
+    expect(state).not.toBe('offline');
+    expect(state).not.toBe('walking');
+  });
+
+  it('LIVE: offline agent → offline only (never upgraded to idle)', () => {
+    const agent = makeAgent({ status: 'offline' });
+    expect(deriveMotionState(agent, false)).toBe('offline');
+  });
+
+  it('LIVE: error agent → error variant (not silently idle)', () => {
+    const agent = makeAgent({ status: 'error' });
+    const state = deriveMotionState(agent, false);
+    expect(['error', 'unknown']).toContain(state);
+    expect(state).not.toBe('idle');
+  });
+
+  it('LIVE: walking state never produced by deriveMotionState regardless of status', () => {
+    const statuses: Array<Agent['status']> = ['online', 'working', 'busy', 'waiting', 'offline', 'unknown', 'error'];
+    for (const status of statuses) {
+      const agent = makeAgent({ status });
+      expect(deriveMotionState(agent, false)).not.toBe('walking');
+    }
+  });
+});

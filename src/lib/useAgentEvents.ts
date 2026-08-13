@@ -6,8 +6,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { NormalizedEvent } from './events';
 import { sanitizeEventText, shouldShowBubble, getEventTTL } from './events';
+import type { AgentStatus } from '../types';
+
+function statusFromEvent(type: string): AgentStatus | null {
+  const normalized = type.toLowerCase();
+  if (normalized.includes('error') || normalized.includes('failed')) return 'error';
+  if (['session.message', 'message.started', 'turn.started', 'tool.started', 'task.started', 'agent.started'].includes(normalized)) return 'working';
+  if (['message.finished', 'turn.completed', 'turn.finished', 'tool.finished', 'task.completed', 'session.closed'].includes(normalized)) return 'online';
+  return null;
+}
 
 export interface AgentBubble {
+
   agentId: string;
   text: string;
   type: string;
@@ -21,6 +31,7 @@ const BUBBLE_QUEUE_SIZE = 3;
 export function useAgentEvents(isMock: boolean) {
   const [bubbles, setBubbles] = useState<Map<string, AgentBubble>>(new Map());
   const [events, setEvents] = useState<NormalizedEvent[]>([]);
+  const [statusByAgent, setStatusByAgent] = useState<Map<string, AgentStatus>>(new Map());
   const eventSourceRef = useRef<EventSource | null>(null);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -45,6 +56,11 @@ export function useAgentEvents(isMock: boolean) {
 
   // Process incoming event
   const processEvent = useCallback((event: NormalizedEvent) => {
+    const nextStatus = statusFromEvent(event.type);
+    if (nextStatus && event.agentId) {
+      setStatusByAgent((prev) => new Map(prev).set(event.agentId, nextStatus));
+    }
+
     if (!shouldShowBubble(event.type)) return;
     if (!event.agentId) return;
 
@@ -128,5 +144,5 @@ export function useAgentEvents(isMock: boolean) {
     } catch { return false; }
   }, []);
 
-  return { bubbles, events, injectEvent };
+  return { bubbles, events, statusByAgent, injectEvent };
 }

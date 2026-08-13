@@ -24,6 +24,7 @@ export interface NormalizedEvent {
   timestamp: string;
   type: NormalizedEventType;
   agentId: string;
+  runtimeAgentId?: string;
   targetAgentId?: string;
   sessionId?: string;
   text?: string;

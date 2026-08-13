@@ -20,6 +20,7 @@ export interface NormalizedEvent {
   timestamp: string;
   type: string;
   agentId: string;
+  runtimeAgentId?: string;
   targetAgentId?: string;
   sessionId?: string;
   text?: string;
@@ -95,7 +96,8 @@ export class GatewayEventBus {
       session.id,
     );
 
-    const agentId = canonicalAgentId(explicitAgentId || agentIdFromSession(sessionId));
+    const runtimeAgentId = explicitAgentId || agentIdFromSession(sessionId);
+    const agentId = canonicalAgentId(runtimeAgentId);
     const roleValue = firstString(payload.role, message.role);
     const role = isMessageRole(roleValue) ? roleValue : undefined;
     const text = extractText(
@@ -110,6 +112,7 @@ export class GatewayEventBus {
       id: firstString(payload.eventId, payload.id) || `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: firstString(payload.timestamp, payload.ts) || new Date().toISOString(),
       type: frame.event,
+      runtimeAgentId,
       agentId,
       sessionId,
       text: text.slice(0, 2000),
