@@ -73,11 +73,15 @@ export function mapEventToState(event: {
 
   switch (type) {
     // ── Session message events ───────────────────────────────
+    // NOTE: Production OpenClaw Gateway emits type="chat" (verified from VM SSE capture)
+    // "session.message" is the expected type per spec but actual production uses "chat"
+    case 'chat':
     case 'session.message':
       if (role === 'user') return 'LISTENING';
       if (role === 'assistant') return 'RESPONDING';
       if (role === 'tool') return 'USING_TOOL';
-      return null; // system messages don't change visible state
+      // 'chat' without role = message activity (session active, direction unknown)
+      return 'WORKING';
 
     // ── Agent run lifecycle ──────────────────────────────────
     case 'agent.started':

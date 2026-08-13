@@ -61,30 +61,26 @@ describe('deriveMotionState', () => {
     expect(deriveMotionState(agent, false)).toBe('offline');
   });
 
-  it('returns unknown for error agents', () => {
+  it('returns error for error agents', () => {
     const agent = makeAgent({ status: 'error' });
+    expect(deriveMotionState(agent, true)).toBe('error');
+    expect(deriveMotionState(agent, false)).toBe('error');
+  });
+
+  it('returns unknown for unknown agents (no data, not offline)', () => {
+    const agent = makeAgent({ status: 'unknown' });
+    expect(deriveMotionState(agent, false)).toBe('unknown');
     expect(deriveMotionState(agent, true)).toBe('unknown');
   });
 
-  it('returns atDesk for unknown agents in live mode (not offline)', () => {
-    const agent = makeAgent({ status: 'unknown' });
-    expect(deriveMotionState(agent, false)).toBe('atDesk');
-    expect(deriveMotionState(agent, true)).toBe('atDesk');
-  });
-
-  it('returns atDesk for working agents (mock)', () => {
+  it('LIVE: working agent → working state', () => {
     const agent = makeAgent({ status: 'working' });
-    expect(deriveMotionState(agent, true)).toBe('atDesk');
+    expect(deriveMotionState(agent, false)).toBe('working');
   });
 
-  it('returns atDesk for online agents (live mode)', () => {
+  it('LIVE: online agent → idle (ambient)', () => {
     const agent = makeAgent({ status: 'online' });
-    expect(deriveMotionState(agent, false)).toBe('atDesk');
-  });
-
-  it('returns idle for online agents (mock)', () => {
-    const agent = makeAgent({ status: 'online' });
-    expect(deriveMotionState(agent, true)).toBe('idle');
+    expect(deriveMotionState(agent, false)).toBe('idle');
   });
 });
 
@@ -118,17 +114,17 @@ describe('getStaticAsset', () => {
 
 // ── REGRESSION: LIVE mode produces no demo activity ─────────
 describe('LIVE mode: no synthetic/demo activity (isMock=false)', () => {
-  it('LIVE: online agent → idle or atDesk (ambient only, never fake walking)', () => {
+  it('LIVE: online agent → idle (ambient only, never fake walking)', () => {
     const agent = makeAgent({ status: 'online' });
     const state = deriveMotionState(agent, false);
     expect(state).not.toBe('walking');
-    expect(['idle', 'atDesk']).toContain(state);
+    expect(state).toBe('idle'); // TS source: LIVE online → 'idle'
   });
 
-  it('LIVE: working agent → atDesk (active desk state, not demo walking)', () => {
+  it('LIVE: working agent → working (real runtime state, not demo walking)', () => {
     const agent = makeAgent({ status: 'working' });
     const state = deriveMotionState(agent, false);
-    expect(state).toBe('atDesk'); // LIVE: working shows at-desk, not walking
+    expect(state).toBe('working'); // TS source: LIVE working → 'working'
     expect(state).not.toBe('walking');
   });
 

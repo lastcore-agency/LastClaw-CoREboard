@@ -111,14 +111,14 @@ describe('AgentStatus type includes unknown', () => {
 });
 
 describe('deriveMotionState with unknown status', () => {
-  it('returns atDesk for unknown agents in LIVE mode', () => {
+  it('returns unknown for unknown agents in LIVE mode (no data, not offline)', () => {
     const agent = makeAgent({ status: 'unknown' });
-    expect(deriveMotionState(agent, false)).toBe('atDesk');
+    expect(deriveMotionState(agent, false)).toBe('unknown');
   });
 
-  it('returns atDesk for unknown agents in MOCK mode', () => {
+  it('returns unknown for unknown agents in MOCK mode', () => {
     const agent = makeAgent({ status: 'unknown' });
-    expect(deriveMotionState(agent, true)).toBe('atDesk');
+    expect(deriveMotionState(agent, true)).toBe('unknown');
   });
 
   it('returns offline for offline agents (not atDesk)', () => {
@@ -127,9 +127,9 @@ describe('deriveMotionState with unknown status', () => {
     expect(deriveMotionState(agent, true)).toBe('offline');
   });
 
-  it('returns atDesk for working agents in LIVE mode', () => {
+  it('returns working for working agents in LIVE mode (real runtime state)', () => {
     const agent = makeAgent({ status: 'working' });
-    expect(deriveMotionState(agent, false)).toBe('atDesk');
+    expect(deriveMotionState(agent, false)).toBe('working');
   });
 });
 

@@ -33,8 +33,25 @@ describe('mapEventToState — event type → RuntimeAgentState', () => {
     expect(mapEventToState({ type: 'session.message', role: 'assistant' })).toBe('RESPONDING');
   });
 
-  it('session.message + role=system → null (no state change)', () => {
-    expect(mapEventToState({ type: 'session.message', role: 'system' })).toBeNull();
+  it('session.message + role=system → WORKING (unknown direction, session active)', () => {
+    // NOTE: Production uses type='chat' which also falls here with no role
+    // Changed from null to WORKING to avoid silent inactivity during active sessions
+    expect(mapEventToState({ type: 'session.message', role: 'system' })).toBe('WORKING');
+  });
+
+  // ── Real production event type (verified from VM SSE capture) ────────
+  it('chat (production event) + no role → WORKING (session active)', () => {
+    // Production OpenClaw Gateway emits type="chat" not "session.message"
+    // Captured from VM: {type:"chat", runtimeAgentId:"main", text:""}
+    expect(mapEventToState({ type: 'chat' })).toBe('WORKING');
+  });
+
+  it('chat + role=user → LISTENING', () => {
+    expect(mapEventToState({ type: 'chat', role: 'user' })).toBe('LISTENING');
+  });
+
+  it('chat + role=assistant → RESPONDING', () => {
+    expect(mapEventToState({ type: 'chat', role: 'assistant' })).toBe('RESPONDING');
   });
 
   // ── 2. Tool event → USING_TOOL ──────────────────────────
