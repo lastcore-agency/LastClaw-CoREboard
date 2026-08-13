@@ -125,7 +125,8 @@ export function ChatPage() {
   const [showNewSession, setShowNewSession] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [newSessionObjective, setNewSessionObjective] = useState('');
-  const [newSessionAgent, setNewSessionAgent] = useState('sirius');
+  // Default to empty — will be updated to first discovered runtime agent after agents load
+  const [newSessionAgent, setNewSessionAgent] = useState('');
   const [pendingMessages, setPendingMessages] = useState<Map<string, TimelineItem>>(new Map());
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -464,16 +465,50 @@ export function ChatPage() {
     }
   }, [newSessionTitle, newSessionObjective, newSessionAgent]);
 
-  // ── Workspace files ────────────────────────────────────────
+  // ── Selected session info ──────────────────────────────────
+  const selectedSession = sessions.find(s => s.key === selectedKey);
+  const selectedMeta = selectedKey ? getSessionMeta(selectedKey) : null;
+  const selectedSource = selectedKey ? classifySessionSource(selectedKey) : 'other';
+  const selectedBadge = getSourceBadge(selectedSource);
+  const selectedAgentName = selectedMeta?.primaryAgentId
+    ? getAgentName(selectedMeta.primaryAgentId)
+    : getAgentName(selectedKey.split(':')[1] || 'main');
+
+  // ── Workspace files (per-agent canonical resolution) ───────
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
+  const [workspaceError, setWorkspaceError] = useState<string>('');
+
+  const activeRuntimeAgentId = useMemo(() => {
+    if (selectedMeta?.primaryAgentId) {
+      return getRuntimeAgentId(selectedMeta.primaryAgentId);
+    }
+    if (selectedKey) {
+      const parts = selectedKey.split(':');
+      for (const part of parts) {
+        const found = CANONICAL_AGENTS.find(a => a.id === part || a.runtimeId === part);
+        if (found) return found.runtimeId;
+      }
+    }
+    // If no session-based identity, return empty — workspace fetch will skip
+    return '';
+  }, [selectedMeta, selectedKey]);
 
   const loadWorkspaceFiles = useCallback(async () => {
+    setWorkspaceError('');
     try {
-      const res = await fetch(`${API}/workspace/main/files?path=`);
+      const res = await fetch(`${API}/workspace/${encodeURIComponent(activeRuntimeAgentId)}/files?path=`);
       const json = await res.json();
-      setWorkspaceFiles(json.data || []);
-    } catch { /* workspace may be unavailable */ }
-  }, []);
+      if (json.error) {
+        setWorkspaceError(json.error);
+        setWorkspaceFiles([]);
+      } else {
+        setWorkspaceFiles(json.data || []);
+      }
+    } catch (err: any) {
+      setWorkspaceError(err.message || 'Workspace unavailable');
+      setWorkspaceFiles([]);
+    }
+  }, [activeRuntimeAgentId]);
 
   useEffect(() => {
     loadWorkspaceFiles();
@@ -481,11 +516,13 @@ export function ChatPage() {
 
   const openFile = useCallback(async (filePath: string) => {
     try {
-      const res = await fetch(`${API}/workspace/main/file?path=${encodeURIComponent(filePath)}`);
+      const res = await fetch(`${API}/workspace/${encodeURIComponent(activeRuntimeAgentId)}/file?path=${encodeURIComponent(filePath)}`);
       const json = await res.json();
-      setContextFile(json.data);
+      if (!json.error && json.data) {
+        setContextFile(json.data);
+      }
     } catch { /* file may be unreadable */ }
-  }, []);
+  }, [activeRuntimeAgentId]);
 
   // ── Session classification ─────────────────────────────────
   const classifiedSessions = useMemo(() => {
@@ -520,15 +557,6 @@ export function ChatPage() {
       return title.toLowerCase().includes(q) || s.key.toLowerCase().includes(q);
     });
   }, [classifiedSessions.native, searchFilter]);
-
-  // ── Selected session info ──────────────────────────────────
-  const selectedSession = sessions.find(s => s.key === selectedKey);
-  const selectedMeta = selectedKey ? getSessionMeta(selectedKey) : null;
-  const selectedSource = selectedKey ? classifySessionSource(selectedKey) : 'other';
-  const selectedBadge = getSourceBadge(selectedSource);
-  const selectedAgentName = selectedMeta?.primaryAgentId
-    ? getAgentName(selectedMeta.primaryAgentId)
-    : getAgentName(selectedKey.split(':')[1] || 'main');
 
   // ── Keyboard shortcuts ─────────────────────────────────────
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -781,7 +809,7 @@ export function ChatPage() {
               <div className="ns-context__value ns-context__agent">
                 <div
                   className="ns-agent-dot"
-                  style={{ background: CANONICAL_AGENTS.find(a => a.id === (selectedMeta?.primaryAgentId || 'sirius'))?.id === 'sirius' ? '#3b82f6' : '#8b5cf6' }}
+                  style={{ background: 'var(--blue-violet, #6366f1)' }}
                 />
                 {selectedAgentName}
                 <span className="ns-participation-badge ns-participation-badge--primary">Primary</span>
@@ -822,9 +850,11 @@ export function ChatPage() {
 
             {/* Related Files */}
             <div className="ns-context__section">
-              <div className="ns-context__label">Workspace Files</div>
+              <div className="ns-context__label">Workspace Files ({activeRuntimeAgentId})</div>
               <div className="ns-context__value">
-                {workspaceFiles.length > 0 ? (
+                {workspaceError ? (
+                  <span className="ns-unknown" style={{ color: '#ef4444' }}>{workspaceError}</span>
+                ) : workspaceFiles.length > 0 ? (
                   <div className="ns-context__files">
                     {workspaceFiles.filter(f => f.type === 'file').slice(0, 10).map(f => (
                       <button

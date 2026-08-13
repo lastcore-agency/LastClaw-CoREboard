@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GatewayEventBus } from '../runtime/gateway/GatewayEvents.js';
 
 describe('GatewayEventBus normalization', () => {
-  it('extracts session key, role, text blocks, and canonical agent from a nested message payload', () => {
+  it('extracts session key, role, text blocks, and runtime agentId from a nested message payload', () => {
     const bus = new GatewayEventBus();
     const event = bus.normalize({
       type: 'event',
@@ -19,7 +19,9 @@ describe('GatewayEventBus normalization', () => {
     });
 
     expect(event.sessionId).toBe('agent:main:lastclaw:abc123');
-    expect(event.agentId).toBe('sirius');
+    // agentId stays as runtime ID 'main' — NOT mapped to presentation identity 'sirius'
+    // Presentation mapping (main→Sirius) is handled in the frontend via installation manifest
+    expect(event.agentId).toBe('main');
     expect(event.role).toBe('assistant');
     expect(event.text).toBe('งานเสร็จแล้วครับ');
     expect(event.timestamp).toBe('1785890000000');

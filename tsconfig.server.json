@@ -9,7 +9,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "composite": true,
+    "declaration": true
   },
   "include": ["server/**/*"],
   "exclude": [
@@ -18,6 +20,7 @@
     "server/test/events.test.ts",
     "server/test/unknown-status.test.ts",
     "server/test/session-types.test.ts",
-    "server/test/session-storage.test.ts"
+    "server/test/session-storage.test.ts",
+    "server/test/agent-activity.test.ts"
   ]
 }

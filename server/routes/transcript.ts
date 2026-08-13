@@ -58,8 +58,10 @@ function findSessionsJson(agentId: string): string | null {
 /** Read session registry and map session key → sessionFile */
 function resolveSessionFile(sessionKey: string): { sessionFile: string; sessionId: string } | null {
   // Extract agentId from session key (first segment after "agent:")
+  // Do NOT fall back to 'main' — if agentId is unknown, fail explicitly
   const parts = sessionKey.split(':');
-  const agentId = parts[0] === 'agent' ? parts[1] : parts[0] || 'main';
+  const agentId = parts[0] === 'agent' ? parts[1] : parts[0] || '';
+  if (!agentId) return null; // Cannot resolve without a valid agentId
 
   const sessionsPath = findSessionsJson(agentId);
   if (!sessionsPath) return null;

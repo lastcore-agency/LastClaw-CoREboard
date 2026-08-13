@@ -15,14 +15,11 @@ const item = {
 };
 
 export function RuntimeSummary({ agents, gateway }: Props) {
-  // Only count known SiX-SQUAD canonical agents for team totals
-  const knownIds = ['sirius', 'draco', 'capella', 'antares', 'polaris', 'altair'];
-  const teamAgents = agents.filter((a) => knownIds.includes(a.id));
-  
-  const activeCount = teamAgents.filter((a) => ['online', 'working', 'busy', 'waiting'].includes(a.status)).length;
-  const busyCount = teamAgents.filter((a) => a.status === 'busy').length;
-  const offlineCount = teamAgents.filter((a) => ['offline', 'error'].includes(a.status)).length;
-  const unknownCount = teamAgents.filter((a) => a.status === 'unknown').length;
+  // Count ALL discovered runtime agents — no hardcoded team filter
+  const activeCount = agents.filter((a) => ['online', 'working', 'busy', 'waiting'].includes(a.status)).length;
+  const busyCount = agents.filter((a) => a.status === 'busy').length;
+  const offlineCount = agents.filter((a) => ['offline', 'error'].includes(a.status)).length;
+  const unknownCount = agents.filter((a) => a.status === 'unknown').length;
 
   return (
     <motion.section variants={container} initial="hidden" animate="show" className="runtime-grid" aria-label="Runtime summary">
@@ -39,7 +36,7 @@ export function RuntimeSummary({ agents, gateway }: Props) {
 
       <motion.div variants={item} style={{ display: 'contents' }}>
         <NeonCard variant="violet">
-          <div className="status-card__label">{teamAgents.length} Agents</div>
+          <div className="status-card__label">{agents.length} Agent{agents.length !== 1 ? 's' : ''}</div>
           <div className="status-card__value" style={{ color: 'var(--green)', display: 'flex', alignItems: 'baseline', gap: 6 }}>
             {activeCount}
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--violet)' }}>Active</span>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent, GatewaySnapshot, SceneConfig, CharacterDirection } from '../../types';
 import { scenes } from '../../data/mockAgents';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useRuntime } from '../../contexts/RuntimeContext';
 import { SourceBadge } from '../ui/SourceBadge';
 import {
   type LayoutState, type LayoutSlot,
@@ -11,6 +12,7 @@ import {
 } from '../../lib/layout';
 import { deriveMotionState, getDirectionFromDelta, getAnimatedIdleAsset, getStaticAsset } from '../../lib/motion';
 import type { AgentBubble } from '../../lib/useAgentEvents';
+import type { RuntimeAgentState } from '../../lib/useAgentActivity';
 
 interface Props {
   agents: Agent[];
@@ -39,15 +41,22 @@ function saveSelectedSceneId(id: string) {
   localStorage.setItem(SCENE_STORAGE_KEY, JSON.stringify({ schemaVersion: SCENE_SCHEMA_VERSION, sceneId: id }));
 }
 
+/**
+ * Runtime handoff visualization — driven by real runtime events.
+ * In MOCK mode only: shows animated handoff between first two available agents.
+ * In LIVE mode: handoff comes from real event (handled via activity store).
+ */
 function useHandoffDemo(agents: Agent[], enabled: boolean) {
   const [handoff, setHandoff] = useState<{ from: Agent; to: Agent } | null>(null);
   useEffect(() => {
     if (!enabled) return;
-    const sirius = agents.find((a) => a.id === 'sirius');
-    const draco = agents.find((a) => a.id === 'draco');
-    if (!sirius || !draco) return;
-    const timer = setInterval(() => { setHandoff({ from: sirius, to: draco }); setTimeout(() => setHandoff(null), 3500); }, 12000);
-    const initial = setTimeout(() => { setHandoff({ from: sirius, to: draco }); setTimeout(() => setHandoff(null), 3500); }, 3000);
+    // Use first 2 online agents available — not hardcoded IDs
+    const online = agents.filter((a) => a.status !== 'offline' && a.status !== 'unknown');
+    const agentA = online[0];
+    const agentB = online[1];
+    if (!agentA || !agentB) return;
+    const timer = setInterval(() => { setHandoff({ from: agentA, to: agentB }); setTimeout(() => setHandoff(null), 3500); }, 12000);
+    const initial = setTimeout(() => { setHandoff({ from: agentA, to: agentB }); setTimeout(() => setHandoff(null), 3500); }, 3000);
     return () => { clearInterval(timer); clearTimeout(initial); };
   }, [agents, enabled]);
   return handoff;
@@ -72,6 +81,7 @@ function ScenePicture({ scene, variant, isMobile }: { scene: SceneConfig; varian
 
 export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbles }: Props) {
   const { businessName } = useSettings();
+  const { activity, getAgentRuntimeState } = useRuntime();
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isMobile, setIsMobile] = useState(false);
@@ -239,7 +249,10 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
           <select className="toolbar-btn" value={selectedSceneId} onChange={(e) => handleSceneChange(e.target.value)} aria-label="Select office scene" style={{ appearance: 'auto', paddingRight: 16 }}>
             {scenes.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
           </select>
-          <span className="toolbar-btn">SiX-SQUAD <SourceBadge source={gateway?.source || 'EMPTY'} /></span>
+          <span className="toolbar-btn">
+              {businessName || 'Runtime Office'}
+              <SourceBadge source={gateway?.source || 'EMPTY'} />
+            </span>
 
           {editMode ? (
             <>
@@ -320,14 +333,34 @@ export function VisualOffice({ agents, gateway, selectedId, onSelect, eventBubbl
               ? { x: dragPos.x, y: dragPos.y, scale: isMobile ? 0.8 : 1 }
               : getAgentPos(agent);
 
-            // Bubble logic: real event bubbles take priority over mock bubbles
+            // ── Bubble logic ───────────────────────────────────────
+            // Priority: 1. SSE activity bubble (from activity store)
+            //           2. legacy eventBubbles prop (from useAgentEvents)
+            //           3. mock bubble (agent.bubble, isMock only)
+            const runtimeId = (agent as any).runtimeAgentId || agent.id;
+            const activityBubble = activity.bubbles.get(runtimeId) || activity.bubbles.get(agent.id);
             const eventBubble = eventBubbles?.get(agent.id);
-            const showEventBubble = !editMode && !isDraggingThis && eventBubble && eventBubble.text;
-            const showMockBubble = !editMode && !isDraggingThis && isMock && isSelected && agent.bubble && !showEventBubble;
-            const bubbleText = showEventBubble ? eventBubble!.text : showMockBubble ? agent.bubble : '';
+            const showActivityBubble = !editMode && !isDraggingThis && activityBubble && Date.now() < activityBubble.expiresAt;
+            const showEventBubble = !showActivityBubble && !editMode && !isDraggingThis && eventBubble?.text;
+            const showMockBubble = !showActivityBubble && !showEventBubble && !editMode && !isDraggingThis && isMock && isSelected && agent.bubble;
+            const bubbleText = showActivityBubble
+              ? activityBubble!.text
+              : showEventBubble ? eventBubble!.text
+              : showMockBubble ? agent.bubble : '';
 
-            // Motion-aware asset selection
-            const motionState = deriveMotionState(agent, isMock);
+            // ── Character state: SSE activity → motionState ────────
+            // getAgentRuntimeState() applies timestamp precedence: SSE wins over poll
+            const runtimeState: RuntimeAgentState = getAgentRuntimeState(runtimeId);
+            // Map RuntimeAgentState → legacy AgentMotionState for deriveMotionState compat
+            const agentForMotion: Agent = runtimeState !== 'UNKNOWN' ? {
+              ...agent,
+              status: runtimeState === 'IDLE' ? 'online'
+                : runtimeState === 'OFFLINE' ? 'offline'
+                : runtimeState === 'ERROR' ? 'error'
+                : runtimeState === 'WORKING' || runtimeState === 'THINKING' || runtimeState === 'USING_TOOL' || runtimeState === 'RESPONDING' || runtimeState === 'LISTENING' || runtimeState === 'WAITING' ? 'working'
+                : agent.status,
+            } : agent;
+            const motionState = deriveMotionState(agentForMotion, isMock);
             const agentFacing: CharacterDirection = agent.character.direction || 'front';
             const displayAsset = motionState === 'offline'
               ? getStaticAsset(agent, 'front')

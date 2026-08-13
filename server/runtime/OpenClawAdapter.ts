@@ -10,6 +10,7 @@ import { GatewayClient, type GatewayClientOptions } from './gateway/GatewayClien
 import type { GatewayError } from './gateway/GatewayErrors.js';
 import { env } from '../config/env.js';
 import { loadInstallationManifest } from '../config/manifest.js';
+import { resolveAgentWorkspace, resolveAllAgentWorkspaces, expandHome } from './workspaceResolver.js';
 import type {
   LastClawResponse,
   GatewayHealth,
@@ -101,7 +102,7 @@ function extractError(err: unknown): { code: string; message: string } {
 }
 
 export class OpenClawAdapter {
-  // ── Canonical agent mapping (manifest-aware) ────────────────
+  // ── Canonical agent mapping (manifest-aware & canonical resolver) ──
   mapToCanonicalAgents(rawAgents: any[]): RuntimeAgent[] {
     const manifest = loadInstallationManifest();
     const runtimeTarget = manifest.runtimeTarget || 'unknown';
@@ -124,13 +125,26 @@ export class OpenClawAdapter {
     return rawAgents.map((raw: any) => {
       const runtimeAgentId = raw.agentId || raw.id || '';
       const canonicalId = reverseMap.get(runtimeAgentId) || runtimeAgentId;
-      const manifestAgent = manifest.agents[canonicalId];
       const rawAvail = (raw.availability || 'UNKNOWN').toUpperCase();
       const availability = VALID_AVAILABILITIES.has(rawAvail) ? rawAvail : 'UNKNOWN';
 
-      // Expand ~ to home directory
-      const expandHome = (p: string) =>
-        p.replace(/^~(?=$|\/)/, process.env.HOME || '~');
+      // Canonical workspace resolution
+      let resolvedWorkspace = '';
+      if (raw.workspace && typeof raw.workspace === 'string' && raw.workspace.trim()) {
+        resolvedWorkspace = path.resolve(expandHome(raw.workspace.trim()));
+      } else {
+        const resolution = resolveAgentWorkspace(runtimeAgentId);
+        if (resolution.ok) {
+          resolvedWorkspace = resolution.workspacePath;
+        }
+      }
+
+      // Model resolution: Gateway field = live/resolvedModel
+      // configuredModel comes from openclaw.json (may be pre-injected via mergeConfigModel)
+      const resolvedModel = typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : null;
+      const configuredModel = typeof raw.configuredModel === 'string' && raw.configuredModel.trim()
+        ? raw.configuredModel.trim()
+        : null;
 
       return {
         id: canonicalId,
@@ -139,10 +153,11 @@ export class OpenClawAdapter {
         runtimeTarget,
         runtimeKey: `${runtimeTarget}:${runtimeAgentId}`,
         name: raw.name || canonicalId,
-        model: raw.model || 'unknown',
-        workspace: raw.workspace
-          ? expandHome(raw.workspace)
-          : manifestAgent?.workspace || '',
+        // Prefer live resolvedModel, fall back to configuredModel, then 'unknown'
+        model: resolvedModel || configuredModel || 'unknown',
+        resolvedModel: resolvedModel ?? undefined,
+        configuredModel: configuredModel ?? undefined,
+        workspace: resolvedWorkspace,
         availability,
         bindings: raw.bindings || [],
         role: raw.role || 'agent',
@@ -183,19 +198,21 @@ export class OpenClawAdapter {
     }
   }
 
-  /** List workspaces — resolved from agents */
+  /** List workspaces — resolved from canonical resolver and live agents */
   async listWorkspaces(): Promise<LastClawResponse<Record<string, string>>> {
+    const { workspaces } = resolveAllAgentWorkspaces();
     const result = await this.listAgents();
-    if (result.source === 'ERROR') {
-      return fail({}, result.error!.code, result.error!.message);
-    }
-    const workspaces: Record<string, string> = {};
-    for (const agent of result.data || []) {
-      if (agent.workspace) {
-        workspaces[agent.id] = agent.workspace;
+    if (result.source !== 'ERROR') {
+      for (const agent of result.data || []) {
+        if (agent.workspace) {
+          workspaces[agent.id] = agent.workspace;
+          if (agent.runtimeAgentId && agent.runtimeAgentId !== agent.id) {
+            workspaces[agent.runtimeAgentId] = agent.workspace;
+          }
+        }
       }
     }
-    return ok(workspaces, result.source);
+    return ok(workspaces, result.source === 'ERROR' ? 'CACHED' : result.source);
   }
 
   /** List sessions — extracted from health payload */
@@ -307,11 +324,15 @@ export class OpenClawAdapter {
       const raw = fs.readFileSync(configPath, 'utf-8');
       const parsed = JSON5.parse(raw);
       const defaults = parsed?.agents?.defaults || {};
-      const agents = (parsed?.agents?.list || []).map((a: any) => ({
-        ...a,
-        workspace: a.workspace || defaults.workspace || '',
-        model: a.model || defaults.model || 'unknown',
-      }));
+      const agents = (parsed?.agents?.list || []).map((a: any) => {
+        const agentId = a.id || a.agentId || '';
+        const resolution = resolveAgentWorkspace(agentId);
+        return {
+          ...a,
+          workspace: resolution.ok ? resolution.workspacePath : (a.workspace ? path.resolve(expandHome(a.workspace)) : (defaults.workspace ? path.resolve(expandHome(defaults.workspace)) : '')),
+          model: a.model || defaults.model || 'unknown',
+        };
+      });
       return { source: 'FALLBACK', agents, defaults };
     } catch (err) {
       return { source: 'ERROR', error: { code: 'CONFIG_PARSE_FAILED', message: err instanceof Error ? err.message : String(err) } };

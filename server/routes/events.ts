@@ -143,7 +143,7 @@ if (process.env.NODE_ENV !== 'production') {
       id: `evt-inject-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toISOString(),
       type: req.body.type || 'message.started',
-      agentId: req.body.agentId || 'sirius',
+      agentId: req.body.agentId || '',
       targetAgentId: req.body.targetAgentId,
       text: req.body.text || 'Hello from injected event',
       source: 'LIVE',

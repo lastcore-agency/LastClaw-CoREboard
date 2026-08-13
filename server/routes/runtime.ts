@@ -13,8 +13,30 @@ runtimeRouter.get('/health', async (req, res) => {
 // ── Agents ───────────────────────────────────────────────────
 runtimeRouter.get('/agents', async (req, res) => {
   const result = await adapter.listAgents();
+
+  // Enrich with configuredModel from openclaw.json when Gateway doesn't provide model
+  // This is server-side only — credentials are never forwarded to browser
+  if (result.data && result.data.length > 0) {
+    const fallback = await adapter.readFallbackConfig();
+    const fallbackAgents: any[] = fallback?.agents || [];
+    const fallbackMap = new Map<string, any>();
+    for (const a of fallbackAgents) {
+      if (a.id || a.agentId) fallbackMap.set(a.id || a.agentId, a);
+    }
+
+    result.data = result.data.map((agent: any) => {
+      if (agent.model && agent.model !== 'unknown') return agent; // already resolved
+      const fb = fallbackMap.get(agent.runtimeAgentId) || fallbackMap.get(agent.id);
+      if (fb?.model) {
+        return { ...agent, model: fb.model, configuredModel: fb.model };
+      }
+      return agent;
+    });
+  }
+
   res.json(result);
 });
+
 
 // ── Workspaces ───────────────────────────────────────────────
 runtimeRouter.get('/workspaces', async (req, res) => {

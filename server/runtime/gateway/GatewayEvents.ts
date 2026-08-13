@@ -177,7 +177,10 @@ function agentIdFromSession(sessionId: string): string {
 }
 
 function canonicalAgentId(agentId: string): string {
-  return agentId === 'main' ? 'sirius' : agentId;
+  // Do NOT map runtime IDs to presentation identities here.
+  // 'main' is a valid runtime agent ID — presentation mapping (main→sirius)
+  // belongs in the frontend OpenClaw adapter via the installation manifest.
+  return agentId;
 }
 
 function isMessageRole(value: string): value is 'user' | 'assistant' | 'system' | 'tool' {
