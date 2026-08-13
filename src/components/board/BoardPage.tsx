@@ -232,7 +232,7 @@ function BoardColumn({
           const source = classifySessionSource(session.key);
           const badge = getSourceBadge(source);
           const activity = activityLabel(session.updatedAt);
-          const agentId = metadata?.primaryAgentId || session.key.split(':')[1] || 'main';
+          const agentId = metadata?.primaryAgentId || session.key.split(':')[1] || '';
 
           return (
             <article className="board-card" key={session.key}>

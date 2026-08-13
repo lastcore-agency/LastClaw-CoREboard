@@ -8,26 +8,29 @@ const API = '/api/runtime';
 
 export function StudioPage() {
   const { agents: runtimeAgents } = useRuntime();
-  // Build agent list from runtime discovery — fallback to runtimeAgentId if displayName unavailable
-  // Use runtimeAgentId as the agent selector value (used in workspace API path)
-  const agentOptions = runtimeAgents.length > 0
-    ? runtimeAgents.map(a => ({
-        value: (a as any).runtimeAgentId || a.id,
-        label: `${a.displayName || a.id} (${(a as any).runtimeAgentId || a.id})`,
-      }))
-    : [{ value: 'main', label: 'main' }];
+  // Build agent list from runtime discovery — no fallback to hardcoded IDs
+  // While loading: empty array → selector disabled until runtime responds
+  const agentOptions = runtimeAgents.map(a => ({
+    value: (a as any).runtimeAgentId || a.id,
+    label: `${a.displayName || a.id} (${(a as any).runtimeAgentId || a.id})`,
+  }));
 
-  const [agent, setAgent] = useState(agentOptions[0]?.value || 'main');
+  const [agent, setAgent] = useState('');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileContent | null>(null);
   const [error, setError] = useState('');
 
-  // Reset agent selection when runtime agents load
+  // Auto-select first discovered runtime agent (deterministic, not 'main')
+  // When agent='', workspace fetch is skipped
   useEffect(() => {
-    if (runtimeAgents.length > 0 && !runtimeAgents.some(a => ((a as any).runtimeAgentId || a.id) === agent)) {
+    if (runtimeAgents.length > 0 && !agent) {
       setAgent((runtimeAgents[0] as any).runtimeAgentId || runtimeAgents[0].id);
     }
-  }, [runtimeAgents]);
+    // If current selection is no longer valid (agent list changed), reset to first
+    if (runtimeAgents.length > 0 && agent && !runtimeAgents.some(a => ((a as any).runtimeAgentId || a.id) === agent)) {
+      setAgent((runtimeAgents[0] as any).runtimeAgentId || runtimeAgents[0].id);
+    }
+  }, [runtimeAgents, agent]);
 
   const loadFiles = useCallback(async () => {
     setError('');
@@ -47,7 +50,8 @@ export function StudioPage() {
     }
   }, [agent]);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  // Skip workspace fetch when no agent selected yet
+  useEffect(() => { if (agent) loadFiles(); }, [loadFiles, agent]);
 
   async function openFile(filePath: string) {
     setError('');
@@ -70,9 +74,17 @@ export function StudioPage() {
         <select
           value={agent}
           onChange={e => setAgent(e.target.value)}
-          style={{ background: '#1a1a2e', color: '#e0e0ff', border: '1px solid #333', borderRadius: 6, padding: 8 }}
+          disabled={agentOptions.length === 0}
+          style={{
+            background: '#1a1a2e', color: agentOptions.length === 0 ? '#555' : '#e0e0ff',
+            border: '1px solid #333', borderRadius: 6, padding: 8,
+            cursor: agentOptions.length === 0 ? 'not-allowed' : 'pointer',
+          }}
         >
-          {agentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+          {agentOptions.length === 0
+            ? <option value="">Loading agents…</option>
+            : agentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)
+          }
         </select>
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {files.map(f => (

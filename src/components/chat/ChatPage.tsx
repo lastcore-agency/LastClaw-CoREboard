@@ -337,7 +337,7 @@ export function ChatPage() {
 
     const msg = input.trim();
     const agentId = getRuntimeAgentId(
-      getCanonicalAgentId(selectedKey.split(':')[1] || 'main')
+      getCanonicalAgentId(selectedKey.split(':')[1] || '')
     );
     const sentAt = Date.now();
     const pendingId = `pending-${sentAt}-${Math.random().toString(36).slice(2, 8)}`;
@@ -472,7 +472,7 @@ export function ChatPage() {
   const selectedBadge = getSourceBadge(selectedSource);
   const selectedAgentName = selectedMeta?.primaryAgentId
     ? getAgentName(selectedMeta.primaryAgentId)
-    : getAgentName(selectedKey.split(':')[1] || 'main');
+    : getAgentName(selectedKey.split(':')[1] || '');
 
   // ── Workspace files (per-agent canonical resolution) ───────
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -1021,7 +1021,7 @@ function SessionItem({
   const badge = getSourceBadge(source);
   const agentName = meta?.primaryAgentId
     ? getAgentName(meta.primaryAgentId)
-    : getAgentName(session.key.split(':')[1] || 'main');
+    : getAgentName(session.key.split(':')[1] || '');
 
   return (
     <button
