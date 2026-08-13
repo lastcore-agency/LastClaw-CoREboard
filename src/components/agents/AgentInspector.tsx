@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent, InspectorTab } from '../../types';
 import { SourceBadge } from '../ui/SourceBadge';
+import { useRuntime } from '../../contexts/RuntimeContext';
 
 interface Props { agent: Agent; onClose: () => void; }
 const tabs: { id: InspectorTab; label: string }[] = [{ id: 'status', label: 'Status' }, { id: 'configure', label: 'Configure' }, { id: 'skills', label: 'Skills' }, { id: 'chat', label: 'Chat' }];
@@ -82,10 +83,10 @@ export function AgentInspector({ agent, onClose }: Props) {
             <div className="inspector__agent-id">{safe(agent.id, '—')}</div>
             <div className="inspector__role">{safe(agent.role, 'Agent')}</div>
             <div className="mini-grid">
-              <div className="mini-card"><div className="mini-card__label">Room</div><div className="mini-card__value">{safe(agent.room)}</div></div>
-              <div className="mini-card"><div className="mini-card__label">Model</div><div className="mini-card__value">{safe(agent.model)}</div></div>
-              <div className="mini-card"><div className="mini-card__label">Uptime</div><div className="mini-card__value">{safe(agent.uptime)}</div></div>
-              <div className="mini-card"><div className="mini-card__label">Queue</div><div className="mini-card__value">{safe(agent.queue)}</div></div>
+              <div className="mini-card"><div className="mini-card__label">Room</div><div className="mini-card__value">{safe(agent.room, 'unknown')}</div></div>
+              <div className="mini-card"><div className="mini-card__label">Model</div><div className="mini-card__value">{safe(agent.model, 'unknown')}</div></div>
+              <div className="mini-card"><div className="mini-card__label">Uptime</div><div className="mini-card__value">{safe(agent.uptime, 'Unavailable')}</div></div>
+              <div className="mini-card"><div className="mini-card__label">Queue</div><div className="mini-card__value">{safe(agent.queue, 'Unavailable')}</div></div>
             </div>
           </div>
         </div>
@@ -117,12 +118,20 @@ export function AgentInspector({ agent, onClose }: Props) {
 }
 
 function StatusContent({ agent }: { agent: Agent }) {
+  const { gateway, stale } = useRuntime();
   const progress = typeof agent.progress === 'number' ? agent.progress : 0;
+
+  // Gateway health: from shared context, not per-agent mock field
+  const gwStatus = gateway.status === 'online'
+    ? stale ? 'stale' : 'online'
+    : gateway.status || 'unknown';
+  const gwSource = gateway.source || 'unknown';
+
   return (
     <>
       <div className="panel-card premium-inner-card">
         <div className="panel-card__title">Current Task</div>
-        <div className="task-title">{safe(agent.currentTask, 'No active task')}</div>
+        <div className="task-title">{safe(agent.currentTask, 'Unavailable')}</div>
         {progress > 0 && (
           <>
             <div className="progress-track"><motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.5 }} className="progress-fill" /></div>
@@ -133,11 +142,11 @@ function StatusContent({ agent }: { agent: Agent }) {
       <div className="panel-card premium-inner-card">
         <div className="panel-card__title">Session Info</div>
         <div className="log-list">
-          <div className="log-item">Session: {safe(agent.sessionId, 'N/A')}</div>
-          <div className="log-item">Last Active: {safe(agent.lastActive)}</div>
-          <div className="log-item">Uptime: {safe(agent.uptime)}</div>
-          <div className="log-item">Runtime Health: <span style={{ color: agent.runtimeHealth === 'healthy' ? 'var(--cyan)' : 'var(--amber)' }}>{safe(agent.runtimeHealth, 'unknown')}</span></div>
-          <div className="log-item">Workspace: {safe(agent.workspace)}</div>
+          <div className="log-item">Session: {safe(agent.sessionId, 'No active session')}</div>
+          <div className="log-item">Last Active: {safe(agent.lastActive, 'Unavailable')}</div>
+          <div className="log-item">Uptime: {safe(agent.uptime, 'Unavailable')}</div>
+          <div className="log-item">Gateway Health: <span title={`source: ${gwSource}`}>{gwStatus}</span></div>
+          <div className="log-item">Workspace: {agent.workspace ? safe(agent.workspace) : <span style={{ color: 'var(--amber, #f59e0b)' }}>WORKSPACE_NOT_RESOLVED</span>}</div>
         </div>
       </div>
     </>
