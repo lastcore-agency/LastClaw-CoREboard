@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { RuntimeProvider, useRuntime } from './contexts/RuntimeContext';
 import { CommandCenterHeader } from './components/command-center/CommandCenterHeader';
 import { RuntimeSummary } from './components/command-center/RuntimeSummary';
 import { AgentInspector } from './components/agents/AgentInspector';
@@ -7,14 +8,13 @@ import { VisualOffice } from './components/visual-office/VisualOffice';
 import { TopNavigation } from './components/navigation/TopNavigation';
 import { BottomNavigation } from './components/navigation/BottomNavigation';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { fetchAgents, fetchGateway } from './lib/openclaw';
 import { useAgentEvents } from './lib/useAgentEvents';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ChatPage } from './components/chat/ChatPage';
 import { StudioPage } from './components/studio/StudioPage';
 import { BoardPage } from './components/board/BoardPage';
 import { LayoutSwitcher } from './components/command-center/LayoutSwitcher';
-import type { Agent, ConnectionState, GatewaySnapshot, NavPage } from './types';
+import type { NavPage } from './types';
 
 type LayoutOrder = 'office-first' | 'status-first';
 
@@ -24,17 +24,14 @@ const pageVariants = {
   exit: { opacity: 0, y: -10, filter: 'blur(4px)', scale: 0.99, transition: { duration: 0.2, ease: 'easeIn' } }
 };
 
-export default function App() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [gateway, setGateway] = useState<GatewaySnapshot | null>(null);
+// ── Inner app — consumes RuntimeContext ─────────────────────
+function AppInner() {
+  const { agents, gateway, initialLoading, refreshing, refreshError, stale } = useRuntime();
   const [selectedId, setSelectedId] = useState<string>('');
   const [showInspector, setShowInspector] = useState(false);
   const [activePage, setActivePage] = useState<NavPage>('center');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [connectionState] = useState<ConnectionState>('connected');
 
-  const isMock = String(import.meta.env.VITE_USE_MOCK || "false") === "true";
+  const isMock = String(import.meta.env.VITE_USE_MOCK || 'false') === 'true';
   const { bubbles } = useAgentEvents(isMock);
 
   const [layoutOrder, setLayoutOrder] = useState<LayoutOrder>(() => {
@@ -43,29 +40,6 @@ export default function App() {
     return 'office-first';
   });
 
-  useEffect(() => {
-    localStorage.setItem('coreboard:center-layout-order', layoutOrder);
-  }, [layoutOrder]);
-
-  useEffect(() => {
-    let alive = true;
-    async function load() {
-      try {
-        setLoading(true);
-        const [agentData, gatewayData] = await Promise.all([fetchAgents(), fetchGateway()]);
-        if (!alive) return;
-        setAgents(agentData);
-        setGateway(gatewayData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }
-    void load();
-    return () => { alive = false; };
-  }, []);
-
   const selectedAgent = useMemo(() => agents.find((a) => a.id === selectedId), [agents, selectedId]);
 
   function handleSelectAgent(agentId: string) {
@@ -73,14 +47,15 @@ export default function App() {
     setShowInspector(true);
   }
 
-  if (loading) {
+  // Only block initial render — background refreshes never gate here
+  if (initialLoading) {
     return (
       <div className="app-loading" role="status" aria-label="Loading">
         <motion.span
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5 }}
         >
-          Initializing CoreBoard...
+          Initializing CoreBoard…
         </motion.span>
       </div>
     );
@@ -97,17 +72,27 @@ export default function App() {
         activePage={activePage}
         layoutOrder={layoutOrder}
         onLayoutChange={setLayoutOrder}
+        refreshing={refreshing}
+        stale={stale}
       />
       <TopNavigation activePage={activePage} onNavigate={setActivePage} />
 
-      {error && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="app-banner" role="alert">
-          {error}
+      {/* Transient error banner — never clears last good data */}
+      {refreshError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="app-banner"
+          role="alert"
+        >
+          Connection issue — showing last known data. {refreshError}
         </motion.div>
       )}
 
       <AnimatePresence mode="wait">
-        {activePage === 'center' && gateway && (
+        {activePage === 'center' && (
+          // ⚠️ No gateway null-gate here — VisualOffice renders even when gateway is
+          // transitionally undefined, using whatever last known value we have.
           <motion.div key="center" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="page-container">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {layoutOrder === 'office-first' ? (
@@ -141,21 +126,6 @@ export default function App() {
         {activePage === 'chat' && <ChatPage key="chat" />}
         {activePage === 'studio' && <StudioPage key="studio" />}
         {activePage === 'board' && <BoardPage key="board" onOpenChat={() => setActivePage('chat')} />}
-
-        {false && ['placeholder'].includes(activePage) && (
-          <motion.div key={activePage} variants={pageVariants} initial="initial" animate="animate" exit="exit" className="placeholder-page">
-            <div className="placeholder-card premium-card">
-              <div className="premium-border-trail" aria-hidden="true" />
-              <div className="placeholder-page__icon">
-                {activePage === 'studio' && '<>'}
-                {activePage === 'board' && '📋'}
-                {activePage === 'chat' && '💬'}
-              </div>
-              <div className="placeholder-page__title">{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</div>
-              <div className="placeholder-page__desc">Module coming in next phase</div>
-            </div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -168,5 +138,14 @@ export default function App() {
 
       <BottomNavigation activePage={activePage} onNavigate={setActivePage} />
     </div>
+  );
+}
+
+// ── Root — wraps everything in RuntimeProvider ───────────────
+export default function App() {
+  return (
+    <RuntimeProvider>
+      <AppInner />
+    </RuntimeProvider>
   );
 }

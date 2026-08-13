@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   classifySessionGroup,
   classifySessionSource,
@@ -54,12 +54,16 @@ export function BoardPage({ onOpenChat }: BoardPageProps) {
   const [sessions, setSessions] = useState<RuntimeSessionCard[]>([]);
   const [agents, setAgents] = useState<RuntimeAgentSummary[]>([]);
   const [runtimeSource, setRuntimeSource] = useState('UNKNOWN');
-  const [loading, setLoading] = useState(true);
+  // initialLoading = true only before first successful fetch
+  const [initialLoading, setInitialLoading] = useState(true);
+  // refreshing = silent background indicator
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const everLoadedRef = useRef(false);
   const { connected: sseConnected, events } = useSessionEvents({ maxEvents: 100 });
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (everLoadedRef.current) setRefreshing(true);
     setError('');
     try {
       const [sessionResponse, agentResponse] = await Promise.all([
@@ -85,11 +89,18 @@ export function BoardPage({ onOpenChat }: BoardPageProps) {
       setSessions(normalized);
       setAgents(agentJson.data || []);
       setRuntimeSource(sessionJson.source || agentJson.source || 'UNKNOWN');
+
+      if (!everLoadedRef.current) {
+        everLoadedRef.current = true;
+        setInitialLoading(false);
+      }
     } catch (reason) {
+      // Keep last known good data — only update error indicator
       setError(reason instanceof Error ? reason.message : 'Unable to load runtime projection');
       setRuntimeSource('ERROR');
+      if (!everLoadedRef.current) setInitialLoading(false);
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -126,14 +137,14 @@ export function BoardPage({ onOpenChat }: BoardPageProps) {
     <div className="board-page">
       <header className="board-page__header">
         <div>
-          <div className="board-page__eyebrow">SiX-SQUAD Board</div>
+          <div className="board-page__eyebrow">OpenClaw Runtime</div>
           <h2 className="board-page__title">Runtime Workrooms</h2>
           <p className="board-page__subtitle">
             This is a truthful projection of live OpenClaw sessions. It does not invent Task, Approval, Artifact, or Result state.
           </p>
         </div>
-        <button className="board-page__refresh" onClick={() => void refresh()} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
+        <button className="board-page__refresh" onClick={() => void refresh()} disabled={refreshing}>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </header>
 

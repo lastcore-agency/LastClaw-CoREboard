@@ -9,16 +9,20 @@ interface Props {
   activePage: NavPage;
   layoutOrder: LayoutOrder;
   onLayoutChange: (order: LayoutOrder) => void;
+  /** True during silent background refresh — show subtle indicator */
+  refreshing?: boolean;
+  /** True when data is older than stale threshold */
+  stale?: boolean;
 }
 
-export function CommandCenterHeader({ gateway, activePage, layoutOrder, onLayoutChange }: Props) {
+export function CommandCenterHeader({ gateway, activePage, layoutOrder, onLayoutChange, refreshing, stale }: Props) {
   let connectionState = 'offline';
   let connectionLabel = 'OFFLINE';
-  
+
   if (gateway) {
     if (gateway.source === 'LIVE' && gateway.status === 'online') {
       connectionState = 'connected';
-      connectionLabel = 'CONNECTED';
+      connectionLabel = stale ? 'STALE' : 'LIVE';
     } else if (gateway.source === 'CACHED') {
       connectionState = 'cached';
       connectionLabel = 'CACHED';
@@ -27,6 +31,9 @@ export function CommandCenterHeader({ gateway, activePage, layoutOrder, onLayout
       connectionLabel = 'DEGRADED';
     }
   }
+
+  // Append subtle sync indicator without changing connectionState class
+  const badgeLabel = refreshing ? `${connectionLabel} ↻` : connectionLabel;
 
   return (
     <header className="app-header" role="banner">
@@ -47,7 +54,7 @@ export function CommandCenterHeader({ gateway, activePage, layoutOrder, onLayout
             transition={{ delay: 0.2 }}
           >
             <span className="connection-dot" aria-hidden="true" />
-            {connectionLabel}
+            {badgeLabel}
           </motion.span>
         </div>
       </div>
