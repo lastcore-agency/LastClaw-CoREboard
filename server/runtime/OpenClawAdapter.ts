@@ -125,8 +125,31 @@ export class OpenClawAdapter {
     return rawAgents.map((raw: any) => {
       const runtimeAgentId = raw.agentId || raw.id || '';
       const canonicalId = reverseMap.get(runtimeAgentId) || runtimeAgentId;
-      const rawAvail = (raw.availability || 'UNKNOWN').toUpperCase();
-      const availability = VALID_AVAILABILITIES.has(rawAvail) ? rawAvail : 'UNKNOWN';
+
+      // Availability: prefer explicit field; derive from sessions if not present
+      // OpenClaw Gateway /health does not send availability field directly —
+      // infer from sessions.recent[0].updatedAt age
+      const rawAvail = (raw.availability || '').toUpperCase();
+      // Last active timestamp and session count: from Gateway sessions data (Item 7)
+      const recentSessions: any[] = raw.sessions?.recent || [];
+      const lastActiveAt: number | null = recentSessions.length > 0
+        ? (recentSessions[0].updatedAt || null)
+        : null;
+      const sessionCount: number = raw.sessions?.count || recentSessions.length;
+
+      let availability: string;
+      if (VALID_AVAILABILITIES.has(rawAvail)) {
+        availability = rawAvail;
+      } else {
+        // Derive from session recency — Gateway /health provides sessions but not availability
+        if (lastActiveAt && Date.now() - lastActiveAt < 30 * 60 * 1000) {
+          availability = 'ONLINE'; // Active within 30 min
+        } else if (lastActiveAt) {
+          availability = 'ONLINE'; // Has registered sessions (registered in runtime)
+        } else {
+          availability = 'UNKNOWN'; // No sessions at all
+        }
+      }
 
       // Canonical workspace resolution
       let resolvedWorkspace = '';
@@ -159,6 +182,9 @@ export class OpenClawAdapter {
         configuredModel: configuredModel ?? undefined,
         workspace: resolvedWorkspace,
         availability,
+        // Item 7: last active from real session data
+        lastActiveAt: lastActiveAt ?? undefined,
+        sessionCount,
         bindings: raw.bindings || [],
         role: raw.role || 'agent',
       };
