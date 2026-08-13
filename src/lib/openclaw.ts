@@ -69,8 +69,18 @@ export async function fetchAgents(): Promise<Agent[]> {
           ...teamMatch,
           status,
           model: normalizeModel(rtAgent.model) || teamMatch.model,
-          workspace: rtAgent.workspace || teamMatch.workspace,
+          workspace: typeof rtAgent.workspace === 'string' ? rtAgent.workspace : (teamMatch.workspace || ""),
           source: source,
+          // OVERRIDE MOCKS for dynamic fields
+          uptime: 'Unavailable',
+          queue: 'Unavailable',
+          latency: 'Unavailable',
+          memory: 'Unavailable',
+          lastActive: 'Unavailable',
+          sessionId: '',
+          currentTask: 'Unavailable',
+          runtimeHealth: 'unknown',
+          recentActivity: [],
         });
       } else {
         // Agent present in runtime but absent from Team registry -> neutral fallback identity
@@ -79,7 +89,7 @@ export async function fetchAgents(): Promise<Agent[]> {
           displayName: rtAgent.name || canonicalId,
           role: "Runtime Agent",
           status,
-          currentTask: "Awaiting tasks",
+          currentTask: "Unavailable",
           model: normalizeModel(rtAgent.model) || "unknown",
           progress: 0,
           room: "unknown",
@@ -93,30 +103,39 @@ export async function fetchAgents(): Promise<Agent[]> {
             mobile: { x: 50, y: 50, scale: 1 },
           },
           character: { animated: "", static: "", direction: "front" },
-          bubble: "Hi there.",
+          bubble: "",
           color: "var(--color-slate-400)",
-          uptime: "0m",
-          queue: "0",
-          latency: "0ms",
-          memory: "0MB",
-          lastActive: "just now",
+          uptime: "Unavailable",
+          queue: "Unavailable",
+          latency: "Unavailable",
+          memory: "Unavailable",
+          lastActive: "Unavailable",
           sessionId: "",
           workspace: rtAgent.workspace || "",
           recentActivity: [],
-          runtimeHealth: "healthy",
+          runtimeHealth: "unknown",
           skills: [],
         });
       }
     }
 
-    // 2. Add remaining Team agents not present in runtime
+    // 2. Add remaining Team agents not present in runtime (offline / not discovered)
     for (const teamAgent of teamIdentity) {
       if (!runtimeIds.has(teamAgent.id)) {
         merged.push({
           ...teamAgent,
-          status: "offline",
-          currentTask: "Unavailable",
-          source: source === "LIVE" || source === "CACHED" ? "EMPTY" : source,
+          status: 'offline',
+          // Override ALL dynamic mock fields — do not show fabricated data for offline agents
+          currentTask: 'Unavailable',
+          uptime: 'Unavailable',
+          queue: 'Unavailable',
+          latency: 'Unavailable',
+          memory: 'Unavailable',
+          lastActive: 'Unavailable',
+          sessionId: '',
+          runtimeHealth: 'unknown',
+          recentActivity: [],
+          source: source === 'LIVE' || source === 'CACHED' ? 'EMPTY' : source,
         });
       }
     }

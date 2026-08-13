@@ -7,11 +7,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Agent, CharacterDirection } from '../types';
 
 export type AgentMotionState =
-  | 'idle'
+  | 'idle'       // Online, no active run
+  | 'thinking'   // Inference started / run in progress
+  | 'working'    // Tool execution active
+  | 'usingTool'  // Specific tool call in flight
+  | 'responding' // Assistant message streaming/returned
   | 'walking'
   | 'atDesk'
   | 'talking'
   | 'receiving'
+  | 'waiting'    // Waiting for external resource
+  | 'error'
   | 'offline'
   | 'unknown';
 
@@ -50,18 +56,32 @@ export function getAnimatedIdleAsset(agent: Agent, direction: CharacterDirection
   return `/characters/${agent.id}/idle-${direction}.webp` || agent.character.animated;
 }
 
-/** Derive motion state from runtime data */
+/**
+ * Derive motion state from runtime agent status.
+ * In LIVE mode this drives character animation from real OpenClaw events.
+ * Idle ambient animation is always allowed; fabricated task states are not.
+ */
 export function deriveMotionState(agent: Agent, isMock: boolean): AgentMotionState {
-  if (agent.status === 'offline') return 'offline';
-  if (agent.status === 'error') return 'unknown';
-  // In LIVE mode, agents are at their desk (no fake movement)
-  if (!isMock) return 'atDesk';
-  // In MOCK mode, derive from status
-  if (agent.status === 'working') return 'atDesk';
-  if (agent.status === 'online') return 'idle';
-  if (agent.status === 'busy') return 'atDesk';
-  if (agent.status === 'waiting') return 'idle';
-  if (agent.status === 'unknown') return 'atDesk';
+  const status = agent.status;
+
+  if (status === 'offline') return 'offline';
+  if (status === 'error') return 'error';
+  if (status === 'unknown') return 'unknown';
+
+  // LIVE mode: derive from real runtime status only
+  if (!isMock) {
+    if (status === 'working') return 'working';
+    if (status === 'busy') return 'working';
+    if (status === 'waiting') return 'waiting';
+    if (status === 'online') return 'idle';
+    return 'idle'; // safe default: idle ambient
+  }
+
+  // MOCK mode: same mapping (mock status values match runtime)
+  if (status === 'working') return 'atDesk';
+  if (status === 'online') return 'idle';
+  if (status === 'busy') return 'atDesk';
+  if (status === 'waiting') return 'idle';
   return 'unknown';
 }
 
@@ -167,13 +187,16 @@ export function useAgentMotion({
   // Cleanup on unmount
   useEffect(() => cancelWalk, [cancelWalk]);
 
-  // Determine display asset
+  // Determine display asset from current motion state
   let displayAsset = agent.character.animated;
   if (state === 'walking') {
     displayAsset = getWalkingAsset(agent, facing);
-  } else if (state === 'atDesk' || state === 'idle') {
+  } else if (state === 'atDesk' || state === 'idle' || state === 'working' || state === 'thinking' || state === 'usingTool' || state === 'responding' || state === 'waiting') {
+    // All active states use the animated idle asset — no fake working animation
     displayAsset = getAnimatedIdleAsset(agent, facing);
-  } else if (state === 'offline') {
+  } else if (state === 'offline' || state === 'error') {
+    displayAsset = getStaticAsset(agent, 'front');
+  } else if (state === 'unknown') {
     displayAsset = getStaticAsset(agent, 'front');
   }
 
