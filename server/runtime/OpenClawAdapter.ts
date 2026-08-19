@@ -15,6 +15,10 @@ import type {
   LastClawResponse,
   GatewayHealth,
   RuntimeAgent,
+  NormalizedChannel,
+  NormalizedChannelAccount,
+  NormalizedDeliveryQueueFailure,
+  ChannelConnectionState,
   DataSource,
 } from './types.js';
 
@@ -101,9 +105,155 @@ function extractError(err: unknown): { code: string; message: string } {
   };
 }
 
+// ── Channel + queue normalization helpers ──────────────────
+
+function asStr(v: unknown): string | null {
+  if (typeof v === 'string' && v.trim()) return v.trim();
+  // Real OpenClaw payloads send timestamps as unix ms numbers
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+    return new Date(v).toISOString();
+  }
+  return null;
+}
+
+function asBool(v: unknown): boolean {
+  return v === true;
+}
+
+function asNum(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
+function deriveConnectionState(
+  connected: boolean,
+  reconnectPending: boolean,
+  lastError: string | null,
+): ChannelConnectionState {
+  if (reconnectPending) return 'RECONNECTING';
+  if (lastError) return 'ERROR';
+  if (connected) return 'CONNECTED';
+  return 'DISCONNECTED';
+}
+
+/**
+ * Normalize channels block from raw health payload.
+ * Handles both nested-object shape:
+ *   channels: { discord: { accounts: { main: {...} } } }
+ * and array shape:
+ *   channels: [ { name: 'discord', accounts: [...] } ]
+ * No hardcoded channel or account names.
+ */
+export function normalizeChannels(rawHealth: any): NormalizedChannel[] {
+  const rawChannels = rawHealth?.channels;
+  if (!rawChannels) return [];
+
+  const result: NormalizedChannel[] = [];
+
+  // Array shape
+  if (Array.isArray(rawChannels)) {
+    for (const ch of rawChannels) {
+      const channelName = asStr(ch.name) || 'unknown';
+      const rawAccounts = ch.accounts;
+      result.push({ channelName, accounts: normalizeAccounts(channelName, rawAccounts) });
+    }
+    return result;
+  }
+
+  // Object shape: { channelName: { accounts: { accountId: {...} } | [...] } }
+  if (typeof rawChannels === 'object') {
+    for (const [channelName, chData] of Object.entries(rawChannels as Record<string, any>)) {
+      const rawAccounts = (chData as any)?.accounts;
+      result.push({ channelName, accounts: normalizeAccounts(channelName, rawAccounts) });
+    }
+  }
+
+  return result;
+}
+
+function normalizeAccounts(channelName: string, rawAccounts: any): NormalizedChannelAccount[] {
+  if (!rawAccounts) return [];
+
+  const entries: Array<[string, any]> = Array.isArray(rawAccounts)
+    ? rawAccounts.map((a: any) => [asStr(a.id) || asStr(a.accountId) || 'unknown', a])
+    : Object.entries(rawAccounts as Record<string, any>);
+
+  return entries.map(([accountId, acc]) => {
+    const connected = asBool(acc.connected);
+    const reconnectPending = asBool(acc.reconnectPending);
+    const lastError = asStr(acc.lastError);
+    return {
+      accountId,
+      enabled: asBool(acc.enabled),
+      configured: asBool(acc.configured),
+      running: asBool(acc.running),
+      connected,
+      reconnectPending,
+      reconnectAttempts: asNum(acc.reconnectAttempts),
+      lastConnectedAt: asStr(acc.lastConnectedAt),
+      lastEventAt: asStr(acc.lastEventAt),
+      lastTransportActivityAt: asStr(acc.lastTransportActivityAt),
+      lastInboundAt: asStr(acc.lastInboundAt),
+      lastOutboundAt: asStr(acc.lastOutboundAt),
+      lastError,
+      lastDisconnect: asStr(acc.lastDisconnect),
+      connectionState: deriveConnectionState(connected, reconnectPending, lastError),
+    };
+  });
+}
+
+/**
+ * Normalize deliveryQueues block.
+ * Only returns queues with count > 0 (failures only).
+ * Handles: { outbound: { count: 32, oldestFailedAt: ... } }
+ *   and: { failed: [ { name, count, oldestFailedAt } ] }
+ */
+export function normalizeDeliveryQueues(rawHealth: any): NormalizedDeliveryQueueFailure[] {
+  const rawQueues = rawHealth?.deliveryQueues;
+  if (!rawQueues || typeof rawQueues !== 'object') return [];
+
+  const failures: NormalizedDeliveryQueueFailure[] = [];
+
+  // Array of failed items shape: { failed: [...] }
+  if (Array.isArray(rawQueues.failed)) {
+    for (const item of rawQueues.failed) {
+      const count = asNum(item.count);
+      if (count > 0) {
+        failures.push({
+          queueName: asStr(item.name) || asStr(item.queueName) || 'unknown',
+          count,
+          oldestFailedAt: asStr(item.oldestFailedAt) || asStr(item.oldest) || null,
+        });
+      }
+    }
+    return failures;
+  }
+
+  // Object shape: { outbound: { count, oldestFailedAt }, inbound: {...} }
+  for (const [queueName, qData] of Object.entries(rawQueues)) {
+    if (typeof qData !== 'object' || qData === null) continue;
+    const count = asNum((qData as any).count);
+    if (count > 0) {
+      failures.push({
+        queueName,
+        count,
+        oldestFailedAt:
+          asStr((qData as any).oldestFailedAt) ||
+          asStr((qData as any).oldest) ||
+          null,
+      });
+    }
+  }
+
+  return failures;
+}
+
 export class OpenClawAdapter {
   // ── Canonical agent mapping (manifest-aware & canonical resolver) ──
-  mapToCanonicalAgents(rawAgents: any[]): RuntimeAgent[] {
+  /**
+   * Map raw health agents to canonical RuntimeAgents.
+   * Pass rawHealth to extract channel telemetry and heartbeat info.
+   */
+  mapToCanonicalAgents(rawAgents: any[], rawHealth?: any): RuntimeAgent[] {
     const manifest = loadInstallationManifest();
     const runtimeTarget = manifest.runtimeTarget || 'unknown';
 
@@ -122,36 +272,58 @@ export class OpenClawAdapter {
       'ONLINE', 'WORKING', 'BUSY', 'WAITING', 'OFFLINE', 'ERROR', 'UNKNOWN',
     ]);
 
+    // Pre-normalize channels for channel↔agent matching
+    const normalizedChannels = normalizeChannels(rawHealth || {});
+
     return rawAgents.map((raw: any) => {
       const runtimeAgentId = raw.agentId || raw.id || '';
       const canonicalId = reverseMap.get(runtimeAgentId) || runtimeAgentId;
 
-      // Availability: prefer explicit field; derive from sessions if not present
-      // OpenClaw Gateway /health does not send availability field directly —
-      // infer from sessions.recent[0].updatedAt age
-      const rawAvail = (raw.availability || '').toUpperCase();
-      // Last active timestamp and session count: from Gateway sessions data (Item 7)
+      // ── Session telemetry ────────────────────────────────
+      // session recency = proof of activity, NOT proof of availability
       const recentSessions: any[] = raw.sessions?.recent || [];
-      const lastActiveAt: number | null = recentSessions.length > 0
-        ? (recentSessions[0].updatedAt || null)
-        : null;
-      const sessionCount: number = raw.sessions?.count || recentSessions.length;
+      const sessionCount: number = typeof raw.sessions?.count === 'number'
+        ? raw.sessions.count
+        : recentSessions.length;
 
+      // lastActiveAt = MAX of sessions.recent[].updatedAt (unix ms)
+      let lastActiveAt: number | undefined;
+      for (const s of recentSessions) {
+        const ts = typeof s.updatedAt === 'number' ? s.updatedAt
+          : typeof s.updatedAt === 'string' ? new Date(s.updatedAt).getTime()
+          : null;
+        if (ts && (!lastActiveAt || ts > lastActiveAt)) lastActiveAt = ts;
+        // also check s.age
+        if (!ts && typeof s.age === 'number' && s.age > 0) {
+          const derived = Date.now() - s.age * 1000;
+          if (!lastActiveAt || derived > lastActiveAt) lastActiveAt = derived;
+        }
+      }
+
+      // ── Availability ─────────────────────────────────────
+      // STOP deriving ONLINE from session recency — session recency proves activity, not presence
+      // Only trust explicit availability field from Gateway
+      const rawAvail = (raw.availability || '').toUpperCase();
       let availability: string;
       if (VALID_AVAILABILITIES.has(rawAvail)) {
         availability = rawAvail;
       } else {
-        // Derive from session recency — Gateway /health provides sessions but not availability
-        if (lastActiveAt && Date.now() - lastActiveAt < 30 * 60 * 1000) {
-          availability = 'ONLINE'; // Active within 30 min
-        } else if (lastActiveAt) {
-          availability = 'ONLINE'; // Has registered sessions (registered in runtime)
-        } else {
-          availability = 'UNKNOWN'; // No sessions at all
-        }
+        // No explicit availability field in health payload → UNKNOWN
+        // Do NOT promote to ONLINE based on session count/recency
+        availability = 'UNKNOWN';
       }
 
-      // Canonical workspace resolution
+      // ── Heartbeat (informational only) ───────────────────
+      // heartbeat.enabled=false does NOT mean offline or disabled
+      const heartbeatEnabled: boolean | undefined =
+        raw.heartbeat != null ? asBool(raw.heartbeat?.enabled ?? raw.heartbeat) : undefined;
+      const heartbeatIntervalMs: number | undefined =
+        raw.heartbeat?.intervalMs != null ? asNum(raw.heartbeat.intervalMs) : undefined;
+
+      // ── isDefault ────────────────────────────────────────
+      const isDefault = asBool(raw.isDefault);
+
+      // ── Canonical workspace resolution ───────────────────
       let resolvedWorkspace = '';
       if (raw.workspace && typeof raw.workspace === 'string' && raw.workspace.trim()) {
         resolvedWorkspace = path.resolve(expandHome(raw.workspace.trim()));
@@ -162,12 +334,59 @@ export class OpenClawAdapter {
         }
       }
 
-      // Model resolution: Gateway field = live/resolvedModel
-      // configuredModel comes from openclaw.json (may be pre-injected via mergeConfigModel)
+      // ── Model resolution ─────────────────────────────────
       const resolvedModel = typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : null;
       const configuredModel = typeof raw.configuredModel === 'string' && raw.configuredModel.trim()
         ? raw.configuredModel.trim()
         : null;
+
+      // ── Channel telemetry ─────────────────────────────────
+      // Match channel account to this agent using generic precedence:
+      // 1. explicit runtime/channel binding (if OpenClaw exposes it — future)
+      // 2. manifest channelAccountId (e.g. sirius.channelAccountId = 'sirius')
+      // 3. exact runtimeAgentId == accountId
+      // 4. canonical/presentation alias fallback (canonicalId == accountId)
+      // 5. otherwise: channelConnected = undefined (unmapped)
+      // No hardcoded if (agentId === 'main') return 'sirius' anywhere.
+      let channelAccount: NormalizedChannelAccount | undefined;
+
+      // Precedence 2: manifest channelAccountId
+      const manifestAgent = manifest.agents[canonicalId];
+      const boundAccountId = manifestAgent?.channelAccountId;
+      if (boundAccountId) {
+        findBound: for (const ch of normalizedChannels) {
+          for (const acc of ch.accounts) {
+            if (acc.accountId === boundAccountId) {
+              channelAccount = acc;
+              break findBound;
+            }
+          }
+        }
+      }
+
+      // Precedence 3: exact runtimeAgentId == accountId
+      if (!channelAccount) {
+        findRuntime: for (const ch of normalizedChannels) {
+          for (const acc of ch.accounts) {
+            if (acc.accountId === runtimeAgentId) {
+              channelAccount = acc;
+              break findRuntime;
+            }
+          }
+        }
+      }
+
+      // Precedence 4: canonical/presentation alias fallback
+      if (!channelAccount) {
+        findCanonical: for (const ch of normalizedChannels) {
+          for (const acc of ch.accounts) {
+            if (acc.accountId === canonicalId) {
+              channelAccount = acc;
+              break findCanonical;
+            }
+          }
+        }
+      }
 
       return {
         id: canonicalId,
@@ -176,15 +395,31 @@ export class OpenClawAdapter {
         runtimeTarget,
         runtimeKey: `${runtimeTarget}:${runtimeAgentId}`,
         name: raw.name || canonicalId,
-        // Prefer live resolvedModel, fall back to configuredModel, then 'unknown'
         model: resolvedModel || configuredModel || 'unknown',
         resolvedModel: resolvedModel ?? undefined,
         configuredModel: configuredModel ?? undefined,
         workspace: resolvedWorkspace,
         availability,
-        // Item 7: last active from real session data
-        lastActiveAt: lastActiveAt ?? undefined,
+        // Session telemetry
         sessionCount,
+        lastActiveAt,
+        isDefault,
+        // Heartbeat — informational only
+        heartbeatEnabled,
+        heartbeatIntervalMs,
+        // Channel telemetry (undefined if no matched account)
+        channelConnected: channelAccount?.connected,
+        channelRunning: channelAccount?.running,
+        channelConfigured: channelAccount?.configured,
+        channelEnabled: channelAccount?.enabled,
+        channelReconnectPending: channelAccount?.reconnectPending,
+        channelReconnectAttempts: channelAccount?.reconnectAttempts,
+        lastChannelConnectedAt: channelAccount?.lastConnectedAt ?? null,
+        lastChannelEventAt: channelAccount?.lastEventAt ?? null,
+        lastChannelActivityAt: channelAccount?.lastTransportActivityAt ?? null,
+        lastChannelInboundAt: channelAccount?.lastInboundAt ?? null,
+        lastChannelOutboundAt: channelAccount?.lastOutboundAt ?? null,
+        channelLastError: channelAccount?.lastError ?? null,
         bindings: raw.bindings || [],
         role: raw.role || 'agent',
       };
@@ -195,10 +430,16 @@ export class OpenClawAdapter {
   async getHealth(): Promise<LastClawResponse<GatewayHealth | null>> {
     try {
       const client = getClient();
-      const payload = await client.request('health');
-      const response = ok(payload as GatewayHealth);
-      // Write cache on success
-      await this.writeCacheAtomically('health', payload).catch(() => {});
+      const payload = await client.request('health') as any;
+      // Enrich payload with normalized channel + queue data
+      const enriched: GatewayHealth = {
+        ...(payload as GatewayHealth),
+        normalizedChannels: normalizeChannels(payload),
+        deliveryQueueFailures: normalizeDeliveryQueues(payload),
+      };
+      const response = ok(enriched);
+      // Write cache (redacts tokens internally)
+      await this.writeCacheAtomically('health', enriched).catch(() => {});
       return response;
     } catch (err) {
       const { code, message } = extractError(err);
@@ -217,7 +458,8 @@ export class OpenClawAdapter {
       const client = getClient();
       const health = await client.request('health') as any;
       const rawAgents = health?.agents || [];
-      return ok(this.mapToCanonicalAgents(rawAgents));
+      // Pass full health so channel telemetry can be matched per-agent
+      return ok(this.mapToCanonicalAgents(rawAgents, health));
     } catch (err) {
       const { code, message } = extractError(err);
       return fail([], code, message);

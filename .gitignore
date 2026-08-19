@@ -15,3 +15,24 @@ test-results/
 src/**/*.js
 src/**/*.d.ts
 !src/vite-env.d.ts
+
+# ── Local-only artifacts (never commit) ───────────────────────
+# Screenshots and verification captures
+artifacts/screenshots/
+capture v1/
+
+# ZIP archives — staging assets, not source
+Archive *.zip
+*.zip
+!package-lock.json
+
+# Agent tooling config (local per-machine)
+.agents/
+lastclaw/.agentsroom/
+lastclaw/.mcp.json
+
+# Stray tag/ref files
+ffice-origin-v0.1.0^{}
+
+# Asset staging (raw working copies, not production)
+asset/

@@ -178,7 +178,7 @@ export function useAgentMotion({
         return { x: nx, y: ny };
       });
 
-      walkRef.current.raf = requestAnimationFrame(animate);
+      if (walkRef.current) walkRef.current.raf = requestAnimationFrame(animate);
     };
 
     walkRef.current = { raf: requestAnimationFrame(animate), target: { x: tx, y: ty } };

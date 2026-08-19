@@ -12,6 +12,20 @@ function wait(ms = 150) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Format unix ms timestamp as human-readable relative time (e.g. "17m ago") */
+function formatRelativeTime(ms: number): string {
+  const diff = Date.now() - ms;
+  if (diff < 0) return 'just now';
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+
 /** Normalize a model field that may be a string or {primary, fallbacks} object */
 function normalizeModel(model: unknown): string {
   if (!model) return '';
@@ -71,15 +85,39 @@ export async function fetchAgents(): Promise<Agent[]> {
           model: normalizeModel(rtAgent.model) || teamMatch.model,
           workspace: typeof rtAgent.workspace === 'string' ? rtAgent.workspace : (teamMatch.workspace || ""),
           source: source,
-          // OVERRIDE MOCKS for dynamic fields
+          // Runtime telemetry — truthful fields from LIVE payload
+          runtimeAgentId: rtAgent.runtimeAgentId || rtAgent.id || teamMatch.id,
+          isDefault: rtAgent.isDefault,
+          sessionCount: rtAgent.sessionCount,
+          lastActiveAt: rtAgent.lastActiveAt,
+          channelConnected: rtAgent.channelConnected,
+          channelRunning: rtAgent.channelRunning,
+          channelConfigured: rtAgent.channelConfigured,
+          channelEnabled: rtAgent.channelEnabled,
+          channelReconnectPending: rtAgent.channelReconnectPending,
+          channelReconnectAttempts: rtAgent.channelReconnectAttempts,
+          lastChannelConnectedAt: rtAgent.lastChannelConnectedAt ?? null,
+          lastChannelEventAt: rtAgent.lastChannelEventAt ?? null,
+          lastChannelActivityAt: rtAgent.lastChannelActivityAt ?? null,
+          lastChannelInboundAt: rtAgent.lastChannelInboundAt ?? null,
+          lastChannelOutboundAt: rtAgent.lastChannelOutboundAt ?? null,
+          channelLastError: rtAgent.channelLastError ?? null,
+          heartbeatEnabled: rtAgent.heartbeatEnabled,
+          heartbeatIntervalMs: rtAgent.heartbeatIntervalMs,
+          resolvedModel: rtAgent.resolvedModel,
+          configuredModel: rtAgent.configuredModel,
+          // Override MOCK display fields with Unavailable — no fabricated data
           uptime: 'Unavailable',
           queue: 'Unavailable',
           latency: 'Unavailable',
           memory: 'Unavailable',
-          lastActive: 'Unavailable',
+          // lastActive: human-readable from lastActiveAt when available
+          lastActive: rtAgent.lastActiveAt
+            ? formatRelativeTime(rtAgent.lastActiveAt)
+            : 'Unavailable',
           sessionId: '',
           currentTask: 'Unavailable',
-          runtimeHealth: 'unknown',
+          runtimeHealth: 'degraded',
           recentActivity: [],
         });
       } else {
@@ -109,12 +147,35 @@ export async function fetchAgents(): Promise<Agent[]> {
           queue: "Unavailable",
           latency: "Unavailable",
           memory: "Unavailable",
-          lastActive: "Unavailable",
+          lastActive: rtAgent.lastActiveAt
+            ? formatRelativeTime(rtAgent.lastActiveAt)
+            : "Unavailable",
           sessionId: "",
           workspace: rtAgent.workspace || "",
           recentActivity: [],
-          runtimeHealth: "unknown",
+          runtimeHealth: "degraded",
           skills: [],
+          // Runtime telemetry
+          runtimeAgentId: rtAgent.runtimeAgentId || rtAgent.id || canonicalId,
+          isDefault: rtAgent.isDefault,
+          sessionCount: rtAgent.sessionCount,
+          lastActiveAt: rtAgent.lastActiveAt,
+          channelConnected: rtAgent.channelConnected,
+          channelRunning: rtAgent.channelRunning,
+          channelConfigured: rtAgent.channelConfigured,
+          channelEnabled: rtAgent.channelEnabled,
+          channelReconnectPending: rtAgent.channelReconnectPending,
+          channelReconnectAttempts: rtAgent.channelReconnectAttempts,
+          lastChannelConnectedAt: rtAgent.lastChannelConnectedAt ?? null,
+          lastChannelEventAt: rtAgent.lastChannelEventAt ?? null,
+          lastChannelActivityAt: rtAgent.lastChannelActivityAt ?? null,
+          lastChannelInboundAt: rtAgent.lastChannelInboundAt ?? null,
+          lastChannelOutboundAt: rtAgent.lastChannelOutboundAt ?? null,
+          channelLastError: rtAgent.channelLastError ?? null,
+          heartbeatEnabled: rtAgent.heartbeatEnabled,
+          heartbeatIntervalMs: rtAgent.heartbeatIntervalMs,
+          resolvedModel: rtAgent.resolvedModel,
+          configuredModel: rtAgent.configuredModel,
         });
       }
     }
@@ -133,7 +194,7 @@ export async function fetchAgents(): Promise<Agent[]> {
           memory: 'Unavailable',
           lastActive: 'Unavailable',
           sessionId: '',
-          runtimeHealth: 'unknown',
+          runtimeHealth: 'degraded',
           recentActivity: [],
           source: source === 'LIVE' || source === 'CACHED' ? 'EMPTY' : source,
         });
@@ -162,7 +223,7 @@ export async function fetchGateway(): Promise<GatewaySnapshot> {
     const response = await fetch(`${apiBase}/health`);
     if (!response.ok) throw new Error("Failed to fetch gateway health");
     const json = await response.json();
-    const isLive = json.source === "LIVE";
+    const isLive = json.source === "LIVE" || json.source === "CACHED";
 
     return {
       status: isLive && json.data?.ok ? "online" : "offline",
@@ -172,6 +233,13 @@ export async function fetchGateway(): Promise<GatewaySnapshot> {
       queue: "0",
       sessions: 0,
       source: json.source || "ERROR",
+      // Envelope fields
+      ok: json.data?.ok ?? false,
+      observedAt: json.observedAt,
+      stale: json.stale ?? false,
+      // Normalized telemetry
+      normalizedChannels: json.data?.normalizedChannels ?? [],
+      deliveryQueueFailures: json.data?.deliveryQueueFailures ?? [],
     };
   } catch (err) {
     console.error("fetchGateway error:", err);
@@ -183,6 +251,8 @@ export async function fetchGateway(): Promise<GatewaySnapshot> {
       queue: "0",
       sessions: 0,
       source: "ERROR",
+      normalizedChannels: [],
+      deliveryQueueFailures: [],
     };
   }
 }

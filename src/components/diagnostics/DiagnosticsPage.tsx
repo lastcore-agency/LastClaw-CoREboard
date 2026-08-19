@@ -89,6 +89,11 @@ export function DiagnosticsPage() {
     if (agentId) sessionByAgent.set(agentId, (sessionByAgent.get(agentId) ?? 0) + 1);
   }
 
+  // Normalized channel data from gateway context
+  const normalizedChannels: any[] = gateway?.normalizedChannels ?? [];
+  const deliveryQueueFailures: any[] = gateway?.deliveryQueueFailures ?? [];
+  const hasQueueFailures = deliveryQueueFailures.length > 0;
+
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
       {/* Header */}
@@ -132,24 +137,89 @@ export function DiagnosticsPage() {
           <DiagRow label="Unknown" value={unknownAgents.length} highlight={unknownAgents.length > 0 ? 'warn' : 'ok'} />
           <div style={{ marginTop: 8 }}>
             {(agents ?? []).map((a: any) => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 11 }}>
-                <span style={{ color: '#9090c0' }}>{a.id}</span>
-                <span style={{ display: 'flex', gap: 6, color: '#666' }}>
-                  <span style={{ color: a.runtimeAgentId ? '#4ade80' : '#555' }}>
-                    runtime:{a.runtimeAgentId || '—'}
+              <div key={a.id} style={{ borderBottom: '1px solid #111', padding: '4px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <span style={{ color: '#9090c0' }}>{a.id}</span>
+                  <span style={{ display: 'flex', gap: 6, color: '#666' }}>
+                    <span style={{ color: a.runtimeAgentId ? '#4ade80' : '#555' }}>
+                      runtime:{a.runtimeAgentId || '—'}
+                    </span>
+                    <span style={{
+                      color: a.status === 'online' || a.status === 'working' ? '#4ade80'
+                        : a.status === 'offline' ? '#f87171'
+                        : a.status === 'unknown' ? '#555' : '#fbbf24'
+                    }}>
+                      {a.status}
+                    </span>
                   </span>
-                  <span style={{
-                    color: a.status === 'online' || a.status === 'working' ? '#4ade80'
-                      : a.status === 'offline' ? '#f87171'
-                      : a.status === 'unknown' ? '#555' : '#fbbf24'
-                  }}>
-                    {a.status}
-                  </span>
-                </span>
+                </div>
+                <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#555', marginTop: 2 }}>
+                  <span>Sessions: <span style={{ color: '#9090c0' }}>{a.sessionCount ?? '—'}</span></span>
+                  <span>Last Active: <span style={{ color: '#9090c0' }}>{a.lastActive ?? '—'}</span></span>
+                  <span>Channel: <span style={{ color: a.channelConnected === true ? '#4ade80' : a.channelConnected === false ? '#f87171' : '#555' }}>
+                    {a.channelConnected === true ? 'Connected' : a.channelConnected === false ? 'Disconnected' : 'Unknown'}
+                  </span></span>
+                  <span>Heartbeat: <span style={{ color: '#777' }}>{a.heartbeatEnabled == null ? '—' : a.heartbeatEnabled ? 'on' : 'off'}</span></span>
+                </div>
               </div>
             ))}
           </div>
         </DiagSection>
+
+        {/* ── Channels ─────────────────────────────────────────── */}
+        <DiagSection title={`Channels (${normalizedChannels.length} discovered)`}>
+          {normalizedChannels.length === 0 ? (
+            <DiagRow label="Channels" value="none discovered" />
+          ) : (
+            normalizedChannels.map((ch: any) => (
+              <div key={ch.channelName} style={{ marginBottom: 8 }}>
+                <div style={{ color: '#8b8bff', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{ch.channelName}</div>
+                {(ch.accounts ?? []).map((acc: any) => {
+                  const stateColor = acc.connectionState === 'CONNECTED' ? '#4ade80'
+                    : acc.connectionState === 'RECONNECTING' ? '#fbbf24'
+                    : acc.connectionState === 'ERROR' ? '#f87171'
+                    : acc.connectionState === 'DISCONNECTED' ? '#f87171'
+                    : '#555';
+                  return (
+                    <div key={acc.accountId} style={{ paddingLeft: 8, marginBottom: 4, borderLeft: `2px solid ${stateColor}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                        <span style={{ color: '#9090c0' }}>{acc.accountId}</span>
+                        <span style={{ color: stateColor, fontWeight: 600 }}>{acc.connectionState}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: '#555', display: 'flex', gap: 8, marginTop: 1 }}>
+                        <span>running:{String(acc.running)}</span>
+                        <span>reconnects:{acc.reconnectAttempts ?? 0}</span>
+                        {acc.lastEventAt && <span>lastEvent:{new Date(acc.lastEventAt).toLocaleTimeString()}</span>}
+                        {acc.lastError && <span style={{ color: '#f87171' }}>err:{String(acc.lastError).slice(0, 40)}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </DiagSection>
+
+        {/* ── Delivery Queue ───────────────────────────────────── */}
+        <DiagSection title="Delivery Queue">
+          {!hasQueueFailures ? (
+            <DiagRow label="Outbound" value="OK — no failures" highlight="ok" />
+          ) : (
+            <>
+              <DiagRow label="Status" value={`WARNING — ${deliveryQueueFailures.reduce((s: number, q: any) => s + q.count, 0)} failed`} highlight="warn" />
+              {deliveryQueueFailures.map((q: any) => (
+                <div key={q.queueName} style={{ marginTop: 4 }}>
+                  <DiagRow
+                    label={q.queueName}
+                    value={`${q.count} failed${q.oldestFailedAt ? ` (oldest: ${new Date(q.oldestFailedAt).toLocaleTimeString()})` : ''}`}
+                    highlight="warn"
+                  />
+                </div>
+              ))}
+            </>
+          )}
+        </DiagSection>
+
 
         {/* ── Sessions ─────────────────────────────────────────── */}
         <DiagSection title={`Sessions (${sessions.length} total)`}>

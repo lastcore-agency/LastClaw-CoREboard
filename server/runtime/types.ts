@@ -18,15 +18,64 @@ export interface LastClawResponse<T> {
   };
 }
 
+// ── Channel telemetry ─────────────────────────────────────────
+
+export type ChannelConnectionState =
+  | 'CONNECTED'
+  | 'DISCONNECTED'
+  | 'RECONNECTING'
+  | 'ERROR'
+  | 'UNKNOWN';
+
+export interface NormalizedChannelAccount {
+  accountId: string;
+  enabled: boolean;
+  configured: boolean;
+  running: boolean;
+  connected: boolean;
+  reconnectPending: boolean;
+  reconnectAttempts: number;
+  lastConnectedAt: string | null;
+  lastEventAt: string | null;
+  lastTransportActivityAt: string | null;
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
+  lastError: string | null;
+  lastDisconnect: string | null;
+  /** Derived from account fields — never use for Agent OFFLINE decision */
+  connectionState: ChannelConnectionState;
+}
+
+export interface NormalizedChannel {
+  channelName: string;
+  accounts: NormalizedChannelAccount[];
+}
+
+// ── Delivery queue telemetry ──────────────────────────────────
+
+export interface NormalizedDeliveryQueueFailure {
+  queueName: string;
+  count: number;
+  oldestFailedAt: string | null;
+}
+
+// ── Gateway health ────────────────────────────────────────────
+
 export interface GatewayHealth {
   ok: boolean;
-  ts: number;
+  ts?: number;
   durationMs?: number;
   uptime?: number;
   version?: string;
   pid?: number;
   memory?: { rss: number; heapUsed: number; heapTotal: number };
+  /** Normalized channel connectivity — populated by adapter after normalization */
+  normalizedChannels?: NormalizedChannel[];
+  /** Delivery queue failures (count > 0 only) — populated by adapter */
+  deliveryQueueFailures?: NormalizedDeliveryQueueFailure[];
 }
+
+// ── Runtime agent ─────────────────────────────────────────────
 
 export interface RuntimeAgent {
   id: string;
@@ -36,11 +85,40 @@ export interface RuntimeAgent {
   runtimeKey: string;
   name?: string;
   model?: string;
+  resolvedModel?: string;
+  configuredModel?: string;
   workspace?: string;
   availability?: string;
   bindings?: string[];
   role?: string;
   status?: string;
+
+  // ── Session telemetry ─────────────────────────────────
+  /** Number of sessions registered for this agent in the Gateway */
+  sessionCount?: number;
+  /** Unix ms of the most recent session.recent[].updatedAt */
+  lastActiveAt?: number;
+  /** Whether this is the default agent in the Gateway */
+  isDefault?: boolean;
+
+  // ── Heartbeat — informational only, never used for availability ──
+  heartbeatEnabled?: boolean;
+  heartbeatIntervalMs?: number;
+
+  // ── Channel telemetry (best-match account for this agent) ────
+  channelConnected?: boolean;
+  channelRunning?: boolean;
+  channelConfigured?: boolean;
+  channelEnabled?: boolean;
+  channelReconnectPending?: boolean;
+  channelReconnectAttempts?: number;
+  lastChannelConnectedAt?: string | null;
+  lastChannelEventAt?: string | null;
+  lastChannelActivityAt?: string | null;
+  lastChannelInboundAt?: string | null;
+  lastChannelOutboundAt?: string | null;
+  channelLastError?: string | null;
+
   [key: string]: any;
 }
 

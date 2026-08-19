@@ -21,6 +21,8 @@
     "server/test/unknown-status.test.ts",
     "server/test/session-types.test.ts",
     "server/test/session-storage.test.ts",
-    "server/test/agent-activity.test.ts"
+    "server/test/agent-activity.test.ts",
+    "server/test/telemetry-normalization.test.ts"
+
   ]
 }

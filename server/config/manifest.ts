@@ -13,6 +13,8 @@ export interface InstallationManifest {
     runtimeAliases?: string[];
     publicName?: string;
     workspace?: string;
+    /** Optional presentation-layer channel account binding (e.g. main → sirius for SiX-SQUAD) */
+    channelAccountId?: string;
   }>;
 }
 
@@ -24,7 +26,8 @@ export const defaultSixSquadManifest: InstallationManifest = {
   agents: {
     sirius: {
       runtimeAgentId: 'main',
-      runtimeAliases: ['sirius']
+      runtimeAliases: ['sirius'],
+      channelAccountId: 'sirius',
     },
     draco: { runtimeAgentId: 'draco' },
     capella: { runtimeAgentId: 'capella' },
